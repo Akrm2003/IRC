@@ -6,11 +6,17 @@
 /*   By: asid-ahm <asid-ahm@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 16:00:44 by asid-ahm          #+#    #+#             */
-/*   Updated: 2025/04/28 16:32:37 by asid-ahm         ###   ########.fr       */
+/*   Updated: 2025/05/06 01:40:16 by asid-ahm         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <iostream>
+#include <iostream>  
+#include <cstring>  
+#include <sys/socket.h>  
+#include <netinet/in.h>  
+#include <unistd.h>  
+#include <fcntl.h>  
+
 
 #define RESET   "\033[0m"
 #define BOLD    "\033[1m"
@@ -24,13 +30,10 @@
 #define CYAN    "\033[36m"
 #define WHITE   "\033[37m"
 
-int main(int ac, char **av)
-{
-    if (ac != 3)
-    {
-        std::cerr << RED << "Error:\n      Invalid number of arguments\n" << RESET << std::endl;
-        std::cerr << BLUE << "Usage:\n      ./irc <Port> <Password>\n" << RESET << std::endl;
-        return 1;  // Return an error code
-    }
-    return 0;  // Success
-}
+// int main()
+// {
+//     int port = 4000;
+//     tcp::server server(port);
+//     server.OnMessage(PrintMessage);
+//     server.Listen();
+// }
