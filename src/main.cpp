@@ -1,39 +1,24 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   main.cpp                                           :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: asid-ahm <asid-ahm@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/04/28 16:00:44 by asid-ahm          #+#    #+#             */
-/*   Updated: 2025/05/06 01:40:16 by asid-ahm         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
+#include "includes/Server.hpp"
+#include <iostream>
+#include <cstdlib>
 
-#include <iostream>  
-#include <cstring>  
-#include <sys/socket.h>  
-#include <netinet/in.h>  
-#include <unistd.h>  
-#include <fcntl.h>  
+#define RED "\033[31m"
+#define RESET "\033[0m"
 
-
-#define RESET   "\033[0m"
-#define BOLD    "\033[1m"
-#define UNDERLINE "\033[4m"
-
-#define RED     "\033[31m"
-#define GREEN   "\033[32m"
-#define YELLOW  "\033[33m"
-#define BLUE    "\033[34m"
-#define MAGENTA "\033[35m"
-#define CYAN    "\033[36m"
-#define WHITE   "\033[37m"
-
-// int main()
-// {
-//     int port = 4000;
-//     tcp::server server(port);
-//     server.OnMessage(PrintMessage);
-//     server.Listen();
-// }
+int main(int argc, char **argv) {
+    try {
+        if (argc != 3) {
+            std::cerr << RED << "Error: Invalid number of arguments." << RESET << std::endl;
+            std::cerr << "Usage: ./ircserv <port> <password>" << std::endl;
+            return EXIT_FAILURE;
+        }
+        
+        Server server(argv[1], argv[2]);
+        server.start();
+    } catch (const std::exception& e) {
+        std::cerr << RED << "Error: " << e.what() << RESET << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    return EXIT_SUCCESS;
+}
