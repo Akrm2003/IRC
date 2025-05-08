@@ -38,3 +38,40 @@ void Client::setUsername(const std::string& username) {
 void Client::setAuthenticated(bool auth) {
     _authenticated = auth;
 }
+
+void Client::appendToInputBuffer(const std::string& data)
+{
+    _inputBuffer += data;
+}
+
+bool Client::hasCompleteMessage() const {
+    return _inputBuffer.find("\r\n") != std::string::npos;
+}
+
+std::string Client::getNextMessage(){
+    std::string message;
+    size_t pos = _inputBuffer.find("\r\n");
+    if(pos != std::string::npos)
+    {
+        message = _inputBuffer.substr(0 , pos);
+        _inputBuffer.erase(0 , pos + 2);
+    }
+    return message;
+}
+
+
+void Client::addToOutputBuffer(const std::string& message) {
+    _outputBuffer += message;
+}
+
+std::string Client::getOutputBuffer() {
+    return _outputBuffer;
+}
+
+void Client::clearOutputBuffer() {
+    _outputBuffer.clear();
+}
+
+bool Client::hasDataToSend() const {
+    return !_outputBuffer.empty();
+}

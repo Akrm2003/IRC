@@ -50,6 +50,14 @@ public:
     // Utilities
     void setNonBlocking(int fd);         // Set a file descriptor to non-blocking mode
     void sendToClient(int fd, const std::string& message); // Send data to a client
+
+    //event management hahaha
+    void enableWriteEvent(int fd);
+    void disableWriteEvent(int fd);
+
+    void handleClientOutput(int fd);    // handle client output by checkign if this socket is writable and process any pending outut for that client
+    // fin the client by their file desccriptor 
+    Client* getClientByFd(int fd);
 };
 
 #endif // SERVER_HPP

@@ -6,7 +6,8 @@
 
 Server::Server(const char* port, const char* password) : _running(false) {
     _port = std::atoi(port);
-    if (_port <= 0 || _port > 65535) {
+    if (_port <= 0 || _port > 65535) 
+    {
         throw std::runtime_error("Invalid port number");
     }
     _password = password;
@@ -96,7 +97,8 @@ void Server::handleEvents() {
     }
 
     // Check if the server socket has an event (i.e., new incoming connection)
-    if (_pollfds[0].revents & POLLIN) {
+    if (_pollfds[0].revents & POLLIN) 
+    {
         acceptClient(); // Accept the new client connection
     }
 
@@ -105,6 +107,10 @@ void Server::handleEvents() {
         if (_pollfds[i].revents & POLLIN) {
             // Client sent data to us
             handleClientMessage(_pollfds[i].fd);
+        }
+        if(_pollfds[i].revents & POLLOUT)
+        {
+            handleClientOutput(pollfd[i].fd);
         }
         else if (_pollfds[i].revents & (POLLHUP | POLLERR | POLLNVAL)) {
             // Client disconnected or error occurred
@@ -150,7 +156,7 @@ void Server::acceptClient() {
 void Server::handleClientMessage(int fd) {
     char buffer[1024];
     int bytesRead = recv(fd, buffer, sizeof(buffer) - 1, 0);
-
+    
     if (bytesRead <= 0) {
         if (bytesRead == 0 || (errno != EWOULDBLOCK && errno != EAGAIN)) {
             // Connection closed or error
@@ -158,15 +164,31 @@ void Server::handleClientMessage(int fd) {
         }
         return;
     }
-
-    buffer[bytesRead] = '\0'; // Null terminate the buffer
-
-    // Process client message (for now just print and echo back)
-    std::cout << "Received from client " << fd << ": " << buffer;
-
-    std::string response = "Received: ";
-    response += buffer;
-    sendToClient(fd, response); // Echo message back to client
+    
+    buffer[bytesRead] = '\0';  // Null terminate the buffer
+    
+    // Find the client
+    Client* client = getClientByFd(fd);
+    if (!client) {
+        std::cerr << "Error: Client not found for fd " << fd << std::endl;
+        return;
+    }
+    
+    // Add the received data to the client's input buffer
+    client->appendToInputBuffer(buffer);
+    
+    // Process any complete messages in the buffer
+    while (client->hasCompleteMessage()) {
+        std::string message = client->getNextMessage();
+        std::cout << "Received from client " << fd << ": " << message << std::endl;
+        
+        // For now, just echo back the message with a prefix
+        std::string response = "Received: " + message + "\n";
+        client->addToOutputBuffer(response);
+        
+        // Enable write events to send the response
+        enableWriteEvent(fd);
+    }
 }
 
 void Server::handleClientDisconnect(int fd) {
@@ -205,4 +227,69 @@ void Server::setNonBlocking(int fd) {
 
 void Server::sendToClient(int fd, const std::string& message) {
     send(fd, message.c_str(), message.size(), 0);
+}
+ void Server::enableWriteEvent(int fd) {
+    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
+        if (it->fd == fd) {
+            it->events |= POLLOUT;  // maeen just read it and shut up , i know u will ask what is this weird syntax 
+            break;
+        }
+    }
+}
+
+void Server::disableWriteEvent(int fd) {
+    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
+        if (it->fd == fd) {
+            it->events &= ~POLLOUT;  // Maeen shut up again and dont ask about the ~ its just mean
+            break;
+        }
+    }
+}
+
+//
+
+void Server::handleClientOutput(int fd) {
+    Client* client = getClientByFd(fd); //  // Find a client by their file descriptor
+    
+    if (!client || !client->hasDataToSend()) {
+        // No client found or no data to send, disable write events
+        disableWriteEvent(fd);
+        return;
+    }
+    
+    // Get the data from the client's output buffer
+    std::string dataToSend = client->getOutputBuffer();
+    
+    // Try to send it
+    int bytesSent = send(fd, dataToSend.c_str(), dataToSend.size(), 0);
+    
+    if (bytesSent > 0) {
+        // Successfully sent some data
+        client->clearOutputBuffer();
+        
+        // If we didn't send everything, put the remainder back in the buffer
+        if (bytesSent < (int)dataToSend.size()) {
+            client->addToOutputBuffer(dataToSend.substr(bytesSent));
+        } else {
+            // All data sent, disable write events
+            disableWriteEvent(fd);
+        }
+    } else if (bytesSent < 0) {
+        // Error occurred
+        if (errno != EWOULDBLOCK && errno != EAGAIN) {
+            // A real error, not just "would block"
+            std::cerr << "Error sending data: " << strerror(errno) << std::endl;
+            handleClientDisconnect(fd);
+        }
+        // If it would block, we'll try again later when poll says it's writable
+    }
+}
+
+Client* Server::getClientByFd(int fd) {
+    for (std::vector<Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
+        if (it->getFd() == fd) {
+            return &(*it);
+        }
+    }
+    return NULL;  // Client not found
 }
