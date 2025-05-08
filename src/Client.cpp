@@ -45,17 +45,35 @@ void Client::appendToInputBuffer(const std::string& data)
 }
 
 bool Client::hasCompleteMessage() const {
-    return _inputBuffer.find("\r\n") != std::string::npos;
+    // Check for standard IRC ending \r\n
+    if (_inputBuffer.find("\r\n") != std::string::npos)
+        return true;
+        
+    // Also accept just \n for easier testing with regular netcat
+    if (_inputBuffer.find("\n") != std::string::npos)
+        return true;
+        
+    return false;
 }
 
-std::string Client::getNextMessage(){
+std::string Client::getNextMessage() {
     std::string message;
     size_t pos = _inputBuffer.find("\r\n");
-    if(pos != std::string::npos)
-    {
-        message = _inputBuffer.substr(0 , pos);
-        _inputBuffer.erase(0 , pos + 2);
+    
+    if (pos != std::string::npos) {
+        message = _inputBuffer.substr(0, pos);
+        _inputBuffer.erase(0, pos + 2);
+        return message;
     }
+    
+    // Try with just \n
+    pos = _inputBuffer.find("\n");
+    if (pos != std::string::npos) {
+        message = _inputBuffer.substr(0, pos);
+        _inputBuffer.erase(0, pos + 1);
+        return message;
+    }
+    
     return message;
 }
 

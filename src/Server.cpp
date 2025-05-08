@@ -104,19 +104,18 @@ void Server::handleEvents() {
 
     // Check all other file descriptors (clients)
     for (size_t i = 1; i < _pollfds.size(); i++) {
-        if (_pollfds[i].revents & POLLIN) {
-            // Client sent data to us
-            handleClientMessage(_pollfds[i].fd);
-        }
-        if(_pollfds[i].revents & POLLOUT)
-        {
-            handleClientOutput(pollfd[i].fd);
-        }
-        else if (_pollfds[i].revents & (POLLHUP | POLLERR | POLLNVAL)) {
-            // Client disconnected or error occurred
-            handleClientDisconnect(_pollfds[i].fd);
-        }
+    if (_pollfds[i].revents & POLLIN) {
+        // Client sent data to us
+        handleClientMessage(_pollfds[i].fd);
     }
+    if (_pollfds[i].revents & POLLOUT) {  // Changed from 'else if' to 'if'
+        handleClientOutput(_pollfds[i].fd);
+    }
+    if (_pollfds[i].revents & (POLLHUP | POLLERR | POLLNVAL)) {
+        // Client disconnected or error occurred
+        handleClientDisconnect(_pollfds[i].fd);
+    }
+}
 }
 
 void Server::acceptClient() {
@@ -183,7 +182,7 @@ void Server::handleClientMessage(int fd) {
         std::cout << "Received from client " << fd << ": " << message << std::endl;
         
         // For now, just echo back the message with a prefix
-        std::string response = "Received: " + message + "\n";
+        std::string response = "Received: " + message + "\r\n";  // Changed \n to \r\n
         client->addToOutputBuffer(response);
         
         // Enable write events to send the response
