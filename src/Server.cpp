@@ -226,8 +226,19 @@ void Server::setNonBlocking(int fd) {
 }
 
 void Server::sendToClient(int fd, const std::string& message) {
-    send(fd, message.c_str(), message.size(), 0);
+    Client* client = getClientByFd(fd);
+    if (!client) {
+        std::cerr << "Error: Client not found for fd " << fd << std::endl;
+        return;
+    }
+    
+    // Add the message to the client's output buffer
+    client->addToOutputBuffer(message);
+    
+    // Enable write events for this client
+    enableWriteEvent(fd);
 }
+
  void Server::enableWriteEvent(int fd) {
     for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
         if (it->fd == fd) {
