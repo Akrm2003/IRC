@@ -22,11 +22,19 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -I$(INC_DIR) -c $< -o $@
 
+
 clean:
 	rm -rf $(OBJ_DIR)
 
 fclean: clean
 	rm -f $(NAME)
+
+irssi1:
+	@echo "$(GREEN)Starting IRSSI client 1...$(RESET)"
+	@-docker run -it --name irssi-sender -e TERM -u $(shell id -u):$(shell id -g) \
+	--log-driver=none \
+	-v ${HOME}/.irssi-sender:/home/user/.irssi \
+	irssi
 
 re: fclean all
 
