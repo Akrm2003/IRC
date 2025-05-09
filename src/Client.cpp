@@ -1,7 +1,7 @@
 #include "includes/Client.hpp"
 
 Client::Client(int fd, const std::string& ip) 
-    : _fd(fd), _ip(ip), _authenticated(false) {
+    : _fd(fd), _ip(ip), _authenticated(false) , _registered(false) {
 }
 
 Client::~Client() {
@@ -30,6 +30,7 @@ bool Client::isAuthenticated() const {
 void Client::setNickname(const std::string& nickname) {
     _nickname = nickname;
 }
+
 
 void Client::setUsername(const std::string& username) {
     _username = username;
@@ -92,4 +93,20 @@ void Client::clearOutputBuffer() {
 
 bool Client::hasDataToSend() const {
     return !_outputBuffer.empty();
+}
+
+const std::string& Client::getRealname() const {
+    return _realname;
+}
+
+void Client::setRealname(const std::string& realname) {
+    _realname = realname;
+}
+
+bool Client::isRegistered() const {
+    return _registered;
+}
+
+void Client::setRegistered(bool reg) {
+    _registered = reg;
 }
