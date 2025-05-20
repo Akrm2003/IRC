@@ -24,7 +24,7 @@ bool Channel::isOperator(Client* client) const {
 }
 
 bool Channel::isTopicRestricted() const {
-    return !_topic.empty();
+    return _topicRestricted;
 }
 
 void Channel::addOperator(Client* client) {

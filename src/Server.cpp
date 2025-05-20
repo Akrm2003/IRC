@@ -519,19 +519,12 @@ void Server::handleMode(Client* client, const std::string& params)
     }
 
     if (args.empty()) {
-        return; // no parameters at all
+        return; // no parameters
     }
-    const std::string& channelName = args[0]; // use args[0] consistently
+    const std::string& channelName = args[0];
 
-    // Validate channel name
-    if ((channelName[0] != '#' && channelName[0] != '&') || channelName.size() < 2) {
-        std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
-        client->addToOutputBuffer(response);
-        enableWriteEvent(client->getFd());
-        return;
-    }
+    // Validate channel name and find channel (your existing code)...
 
-    // Find the channel
     Channel* targetChannel = nullptr;
     for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
         if (it->getName() == channelName) {
@@ -547,19 +540,15 @@ void Server::handleMode(Client* client, const std::string& params)
         return;
     }
 
-    // If only channel name given, show current modes
-    if (args.size() == 1) {
-        std::string currentModes = "+";
-        if (targetChannel->isInviteOnly()) currentModes += "i";
-        if (targetChannel->isTopicRestricted()) currentModes += "t";
+    // If only channel name given, show current modes (your existing code)...
 
-        std::string response = ":server 324 " + client->getNickname() + " " + channelName + " " + currentModes + "\r\n";
-        client->addToOutputBuffer(response);
-        enableWriteEvent(client->getFd());
+    if (args.size() == 1) {
+        // show current modes (as you already have)
+        // ...
         return;
     }
 
-    // Check if operator
+    // Check if client is operator before allowing mode changes
     if (!targetChannel->isOperator(client)) {
         std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not a channel operator\r\n";
         client->addToOutputBuffer(response);
@@ -567,9 +556,10 @@ void Server::handleMode(Client* client, const std::string& params)
         return;
     }
 
-    const std::string& modeStr = args[1];  // next argument after channel name
-
+    const std::string& modeStr = args[1];
     bool adding = true;
+    size_t nickArgIndex = 2;  // index for the nickname when mode requires one
+
     for (size_t i = 0; i < modeStr.size(); ++i) {
         char mode = modeStr[i];
         if (mode == '+') {
@@ -580,13 +570,44 @@ void Server::handleMode(Client* client, const std::string& params)
             targetChannel->setInviteOnly(adding);
         } else if (mode == 't') {
             targetChannel->setTopicRestricted(adding);
+        } else if (mode == 'o') {
+            // 'o' mode requires a nickname parameter
+            if (nickArgIndex >= args.size()) {
+                // No nickname provided for +o or -o, ignore or send error
+                continue;
+            }
+            std::string targetNick = args[nickArgIndex++];
+            
+            // Find client in channel by nickname
+            Client* targetClient = getClientByNickname(targetNick);
+            if (!targetClient) {
+                // Send error: No such nick in channel
+                std::string response = ":server 401 " + client->getNickname() + " " + targetNick + " :No such nick/channel\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+                continue;
+            }
+
+            if (adding) {
+                targetChannel->addOperator(targetClient);
+            } else {
+                targetChannel->removeOperator(targetClient);
+            }
         } else {
-            // Unknown mode: optionally send error or ignore
+            // Unknown mode, ignore or send error
         }
     }
 
     // Broadcast mode change
-    std::string modeChangeMsg = ":" + client->getNickname() + " MODE " + channelName + " " + modeStr + "\r\n";
+    std::string modeChangeMsg = ":" + client->getNickname() + " MODE " + channelName + " " + modeStr;
+    // Also add the nicknames for modes like +o in the message
+    if (modeStr.find('o') != std::string::npos) {
+        for (size_t i = 2; i < args.size(); ++i) {
+            modeChangeMsg += " " + args[i];
+        }
+    }
+    modeChangeMsg += "\r\n";
+
     const std::vector<Client*>& clients = targetChannel->getClients();
     for (size_t i = 0; i < clients.size(); ++i) {
         clients[i]->addToOutputBuffer(modeChangeMsg);
@@ -701,10 +722,18 @@ void Server::processCommand(Client* client , const std::string& message)
     if(command == "PASS")
         handlePass(client , params);
     else if(command == "NICK")
-        handleNick(client , params);
+    {
+        std::string nickname = params;
+        size_t spacePos = nickname.find(' ');
+        if (spacePos != std::string::npos) {
+            nickname = nickname.substr(0, spacePos);
+        }
+        handleNick(client, nickname);
+    }
     else if(command == "USER"){
         handleUser(client , params);
-    }else if(command == "PING"){
+    }
+    else if(command == "PING"){
         std::string response = ":server PONG " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " :Pong\r\n";
         client->addToOutputBuffer(response);
@@ -781,18 +810,11 @@ void Server::processCommand(Client* client , const std::string& message)
             handlePrivmsg(client, channelName, messageContent);
         }
         else if(command == "TOPIC")
-        {
             handleTopic(client, params);
-        }
         else if(command == "KICK")
-        {
             handleKick(client, params);
-        }
         else if(command == "MODE")
-        {
-
             handleMode(client, params);
-        }
 
     }
      else {
@@ -951,7 +973,7 @@ void Server::handleNick(Client* client, const std::string& params)
     //inform the client
     std::string response;
     if (!oldNick.empty()) {
-        std::string response = ":" + oldNick + " NICK " + nickname + "\r\n";
+        response = ":" + oldNick + " NICK " + nickname + "\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
     }

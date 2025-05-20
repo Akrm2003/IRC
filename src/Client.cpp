@@ -16,6 +16,7 @@ const std::string& Client::getIp() const {
 }
 
 const std::string& Client::getNickname() const {
+    printf("[DEBUG] Getting nickname: %s\n", _nickname.c_str());
     return _nickname;
 }
 
@@ -28,6 +29,7 @@ bool Client::isAuthenticated() const {
 }
 
 void Client::setNickname(const std::string& nickname) {
+    std::cout << "[DEBUG] Setting nickname to: " << nickname << std::endl;
     _nickname = nickname;
 }
 
