@@ -10,8 +10,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
-
-
+#include "Client.hpp"
+#include "Channel.hpp"
 
 #define RESET   "\033[0m"
 #define BOLD    "\033[1m"
@@ -43,7 +43,7 @@ private:
 
     std::vector<Client> _clients;        // List of all connected clients
     std::vector<pollfd> _pollfds;        // List of pollfd structs used to monitor file descriptors (server + clients)
-
+    std::vector<Channel> _channels;      // List of channels (not used yet, but can be added later)
     bool _running;                       // Indicates if server is running
 
     // Disable copy constructor and assignment (we don’t want accidental copying)
@@ -79,6 +79,7 @@ public:
     void handleClientOutput(int fd);    // handle client output by checkign if this socket is writable and process any pending outut for that client
     // fin the client by their file desccriptor 
     Client* getClientByFd(int fd);
+    Client *getClientByNickname(const std::string& nickname);
 
     //auth commands
     void processCommand(Client* client, const std::string& message);
@@ -86,7 +87,14 @@ public:
     void handleNick(Client* client, const std::string& params);
     void handleUser(Client* client, const std::string& params);
     bool isClientRegistered(Client* client);  // Helper to check if a client has completed registration
-
+    void handleJoin(Client* client, const std::string& channelNameRaw);
+    void handlePart(Client* client, const std::string& channelNameRaw, const std::string& partMessage);
+    void handleTopic(Client* client, const std::string& channelNameRaw);
+    void handleMode(Client* client, const std::string& channelNameRaw);
+    void handleKick(Client* client, const std::string& channelNameRaw);
+    void handlePrivmsg(Client* client, const std::string& channelNameRaw, const std::string& message);
 };
+
+int countArguments(const std::string& params);
 
 #endif // SERVER_HPP

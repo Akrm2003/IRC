@@ -1,9 +1,10 @@
 #include "includes/Server.hpp"
 #include "includes/Client.hpp"
+#include "includes/Channel.hpp"
 #include <stdexcept>
 #include <cstring>
 #include <cerrno>
-
+#include <sstream>
 Server::Server(const char* port, const char* password) : _running(false) {
     _port = std::atoi(port);
     if (_port <= 0 || _port > 65535) 
@@ -11,6 +12,10 @@ Server::Server(const char* port, const char* password) : _running(false) {
         throw std::runtime_error("Invalid port number");
     }
     _password = password;
+    if (_password.empty()) 
+    {
+        throw std::runtime_error("Password cannot be empty");
+    }
     _serverSocket = -1;
 }
 
@@ -27,6 +32,17 @@ Server::~Server() {
         }
     }
 }
+
+Client* Server::getClientByNickname(const std::string& nickname) 
+{
+    for (std::vector<Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
+        if (it->getNickname() == nickname) {
+            return &(*it);
+        }
+    }
+    return NULL;  // Client not found
+}
+
 
 void Server::start() {
     setupSocket();
@@ -310,6 +326,353 @@ Client* Server::getClientByFd(int fd) {
     return NULL;  // Client not found
 }
 
+void Server::handlePart(Client* client, const std::string& channelNameRaw, const std::string& partMessage) {
+    std::string channelName = channelNameRaw;
+
+    // Validate channel name: must start with '#' or '&' and have at least 2 chars
+    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1]) {
+        std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
+        response += " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Look for the channel in the server's list
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
+        if (it->getName() == channelName) {
+            // Channel found: try to remove the client from the channel
+            if (it->removeClient(client)) {
+                // Prepare PART message to notify all clients
+                std::string partMsg = ":" + client->getNickname() + " PART " + channelName;
+                if (!partMessage.empty())
+                    partMsg += " :" + partMessage;
+                partMsg += "\r\n";
+
+                // Notify the leaving client
+                client->addToOutputBuffer(partMsg);
+
+                // Notify all other clients in the channel
+                const std::vector<Client*>& clients = it->getClients();
+                for (size_t i = 0; i < clients.size(); ++i) {
+                    if (clients[i] != client) {
+                        clients[i]->addToOutputBuffer(partMsg);
+                        enableWriteEvent(clients[i]->getFd());
+                    }
+                }
+
+                enableWriteEvent(client->getFd());
+
+                // Remove the channel if it is now empty
+                if (it->getClients().empty()) {
+                    _channels.erase(it);
+                }
+
+            } else {
+                // Client wasn't in the channel, send error 442 (You're not on that channel)
+                std::string response = ":server 442 " + (client->getNickname().empty() ? "*" : client->getNickname());
+                response += " " + channelName + " :You're not on that channel\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+            }
+            return;
+        }
+    }
+
+    // Channel does not exist, send error 403
+    std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
+    response += " " + channelName + " :No such channel\r\n";
+    client->addToOutputBuffer(response);
+    enableWriteEvent(client->getFd());
+}
+
+
+
+// NOTE: Now accepts the actual message content from the user, instead of a hardcoded string
+void Server::handlePrivmsg(Client* client, const std::string& channelNameRaw, const std::string& messageContent) {
+    std::string channelName = channelNameRaw;
+
+    // Validate channel name as before
+    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1]) {
+        std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
+        response += " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Find the channel in the server list
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
+        if (it->getName() == channelName) {
+
+            if (!it->hasClient(client)) {
+                std::string response = ":server 404 " + client->getNickname() + " " + channelName + " :Cannot send to channel\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+                return;
+            }
+            // *** MODIFICATION: Use the actual message from the user ***
+            std::string message = ":" + client->getNickname() + " PRIVMSG " + channelName + " :" + messageContent + "\r\n";
+
+            // Send message to all clients in the channel
+            const std::vector<Client*>& clients = it->getClients();
+            for (size_t i = 0; i < clients.size(); ++i) {
+                clients[i]->addToOutputBuffer(message);
+                enableWriteEvent(clients[i]->getFd());
+            }
+
+            enableWriteEvent(client->getFd());
+            return;
+        }
+    }
+
+    // Channel does not exist, send error 403
+    std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
+    response += " " + channelName + " :No such channel\r\n";
+    client->addToOutputBuffer(response);
+    enableWriteEvent(client->getFd());
+}
+
+
+void Server::handleKick(Client* client, const std::string& params)
+{
+    std::istringstream iss(params);
+    std::string channelName, targetNick;
+    iss >> channelName >> targetNick;
+
+    // Check for required parameters
+    if (channelName.empty() || targetNick.empty()) {
+        std::string response = ":server 461 " + client->getNickname() + " KICK :Not enough parameters\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Check valid channel name format
+    if ((channelName[0] != '#' && channelName[0] != '&') || channelName.size() < 2) {
+        std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Find the channel
+    Channel* targetChannel = nullptr;
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
+        if (it->getName() == channelName) {
+            targetChannel = &(*it);
+            break;
+        }
+    }
+
+    if (!targetChannel) {
+        std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Check if the sender is a channel operator
+    if (!targetChannel->isOperator(client)) {
+        std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not a channel operator\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Find the target client by nickname
+    Client* targetClient = getClientByNickname(targetNick); // You need this helper
+    if (!targetClient) {
+        std::string response = ":server 401 " + client->getNickname() + " " + targetNick + " :No such nick\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Check if the target is in the channel
+    if (!targetChannel->hasClient(targetClient)) {
+        std::string response = ":server 441 " + client->getNickname() + " " + targetNick + " " + channelName + " :They aren't on that channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Notify all users in the channel
+    std::string kickMsg = ":" + client->getNickname() + " KICK " + channelName + " " + targetNick + "\r\n";
+    const std::vector<Client*>& clients = targetChannel->getClients();
+    for (size_t i = 0; i < clients.size(); ++i) {
+        clients[i]->addToOutputBuffer(kickMsg);
+        enableWriteEvent(clients[i]->getFd());
+    }
+
+    // Remove target client from the channel
+    targetChannel->removeClient(targetClient);
+}
+
+void Server::handleMode(Client* client, const std::string& params)
+{
+    std::vector<std::string> args;
+    std::istringstream iss(params);
+    std::string token;
+    while (iss >> token) {
+        args.push_back(token);
+    }
+
+    if (args.empty()) {
+        return; // no parameters at all
+    }
+    const std::string& channelName = args[0]; // use args[0] consistently
+
+    // Validate channel name
+    if ((channelName[0] != '#' && channelName[0] != '&') || channelName.size() < 2) {
+        std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Find the channel
+    Channel* targetChannel = nullptr;
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
+        if (it->getName() == channelName) {
+            targetChannel = &(*it);
+            break;
+        }
+    }
+
+    if (!targetChannel) {
+        std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // If only channel name given, show current modes
+    if (args.size() == 1) {
+        std::string currentModes = "+";
+        if (targetChannel->isInviteOnly()) currentModes += "i";
+        if (targetChannel->isTopicRestricted()) currentModes += "t";
+
+        std::string response = ":server 324 " + client->getNickname() + " " + channelName + " " + currentModes + "\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Check if operator
+    if (!targetChannel->isOperator(client)) {
+        std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not a channel operator\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    const std::string& modeStr = args[1];  // next argument after channel name
+
+    bool adding = true;
+    for (size_t i = 0; i < modeStr.size(); ++i) {
+        char mode = modeStr[i];
+        if (mode == '+') {
+            adding = true;
+        } else if (mode == '-') {
+            adding = false;
+        } else if (mode == 'i') {
+            targetChannel->setInviteOnly(adding);
+        } else if (mode == 't') {
+            targetChannel->setTopicRestricted(adding);
+        } else {
+            // Unknown mode: optionally send error or ignore
+        }
+    }
+
+    // Broadcast mode change
+    std::string modeChangeMsg = ":" + client->getNickname() + " MODE " + channelName + " " + modeStr + "\r\n";
+    const std::vector<Client*>& clients = targetChannel->getClients();
+    for (size_t i = 0; i < clients.size(); ++i) {
+        clients[i]->addToOutputBuffer(modeChangeMsg);
+        enableWriteEvent(clients[i]->getFd());
+    }
+}
+
+
+
+void Server::handleJoin(Client* client, const std::string& channelNameRaw)
+{
+    std::string channelName = channelNameRaw;
+
+    // Validate channel name
+    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1]) {
+        std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
+        response += " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Check if the channel already exists
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
+        if (it->getName() == channelName) {
+            // Channel already exists, try to add the client
+            if (it->addClient(client)) {
+                std::string joinMsg = ":" + client->getNickname() + " JOIN " + channelName + "\r\n";
+
+                // Notify the joining client
+                client->addToOutputBuffer(joinMsg);
+
+                // Send topic if exists
+                if (!it->getTopic().empty()) {
+                    std::string topicReply = ":server 332 " + client->getNickname() + " " + channelName + " :" + it->getTopic() + "\r\n";
+                    client->addToOutputBuffer(topicReply);
+                }
+
+                // Send NAMES list
+                std::string namesReply = ":server 353 " + client->getNickname() + " = " + channelName + " :";
+                const std::vector<Client*>& clients = it->getClients();
+                for (size_t i = 0; i < clients.size(); ++i) {
+                    namesReply += clients[i]->getNickname() + " ";
+                }
+                namesReply += "\r\n";
+                std::string endOfNames = ":server 366 " + client->getNickname() + " " + channelName + " :End of /NAMES list\r\n";
+
+                client->addToOutputBuffer(namesReply);
+                client->addToOutputBuffer(endOfNames);
+
+                // Broadcast JOIN to other clients
+                for (size_t i = 0; i < clients.size(); ++i) {
+                    if (clients[i] != client) {
+                        clients[i]->addToOutputBuffer(joinMsg);
+                        enableWriteEvent(clients[i]->getFd());
+                    }
+                }
+
+                enableWriteEvent(client->getFd());
+            } else {
+                // Client is already in the channel
+                std::string response = ":server 442 " + (client->getNickname().empty() ? "*" : client->getNickname());
+                response += " " + channelName + " :You're already on that channel\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+            }
+            return;
+        }
+    }
+
+    // Channel doesn't exist: create new and add the client
+    Channel newChannel(channelName, client);
+    _channels.push_back(newChannel);
+
+    std::string joinMsg = ":" + client->getNickname() + " JOIN " + channelName + "\r\n";
+    client->addToOutputBuffer(joinMsg);
+
+    // No topic yet
+    std::string namesReply = ":server 353 " + client->getNickname() + " = " + channelName + " :" + client->getNickname() + "\r\n";
+    std::string endOfNames = ":server 366 " + client->getNickname() + " " + channelName + " :End of /NAMES list\r\n";
+
+    client->addToOutputBuffer(namesReply);
+    client->addToOutputBuffer(endOfNames);
+
+    enableWriteEvent(client->getFd());
+}
 
 void Server::processCommand(Client* client , const std::string& message)
 {
@@ -341,7 +704,98 @@ void Server::processCommand(Client* client , const std::string& message)
         handleNick(client , params);
     else if(command == "USER"){
         handleUser(client , params);
-    } else {
+    }else if(command == "PING"){
+        std::string response = ":server PONG " + (client->getNickname().empty() ? "*" : client->getNickname());
+        response += " :Pong\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+    }
+    else if(command == "CAP")
+    {
+        if (params == "LS")
+        {
+            std::string response = ":server CAP * LS :multi-prefix\r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+        }
+        else if (params == "REQ")
+        {
+            std::string response = ":server CAP * ACK :multi-prefix\r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+        }
+        else
+        {
+            std::string response = ":server 501 " + (client->getNickname().empty() ? "*" : client->getNickname());
+            response += " :Unknown CAP command\r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+        }
+    }
+    else if(client->isAuthenticated() && client->isRegistered())
+    {
+        if(command == "JOIN")
+        {
+            if (params.empty())
+            {
+                std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
+                response += " " + params + " :No such channel\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+                return;
+            }
+            else
+                handleJoin(client, params);
+        }
+        else if (command == "PART") {
+            std::string channelName;
+            std::string partMessage;
+        
+            size_t firstSpace = params.find(' ');
+            if (firstSpace != std::string::npos) {
+                channelName = params.substr(0, firstSpace);
+                partMessage = params.substr(firstSpace + 1);
+                if (!partMessage.empty() && partMessage[0] == ':')
+                    partMessage = partMessage.substr(1); // remove leading colon
+            } else {
+                channelName = params; // No message, just the channel
+            }
+            handlePart(client, channelName, partMessage);
+        }
+        
+        else if(command == "PRIVMSG")
+        {
+            size_t spacePos = params.find(' ');
+            std::string channelName = params.substr(0, spacePos);
+            std::string messageContent = params.substr(spacePos + 1);
+            // Check if the message content is empty
+            if (messageContent.empty())
+            {
+                std::string response = ":server 411 " + (client->getNickname().empty() ? "*" : client->getNickname());
+                response += " " + channelName + " :No recipient given\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+                return;
+            }
+            // Handle the PRIVMSG command
+            handlePrivmsg(client, channelName, messageContent);
+        }
+        else if(command == "TOPIC")
+        {
+            handleTopic(client, params);
+        }
+        else if(command == "KICK")
+        {
+            handleKick(client, params);
+        }
+        else if(command == "MODE")
+        {
+
+            handleMode(client, params);
+        }
+
+    }
+     else {
         std::string response = " :server 421 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " " + command + " : Unknown command \r\n";
         client->addToOutputBuffer(response);
@@ -349,6 +803,84 @@ void Server::processCommand(Client* client , const std::string& message)
     }
 
 }
+
+void Server::handleTopic(Client* client, const std::string& params)
+{
+    std::string channelName;
+    std::string topic;
+
+    size_t spacePos = params.find(' ');
+    if (spacePos != std::string::npos) {
+        channelName = params.substr(0, spacePos);
+        topic = params.substr(spacePos + 1);
+    } else {
+        channelName = params;
+    }
+
+    // Validate channel name
+    if ((channelName[0] != '#' && channelName[0] != '&') || channelName.length() < 2) {
+        std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
+        response += " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Find the channel
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
+        if (it->getName() == channelName) {
+
+            // If no topic is provided, it's a topic query
+            if (topic.empty()) {
+                std::string response;
+                if (it->getTopic().empty())
+                    response = ":server 331 " + client->getNickname() + " " + channelName + " :No topic is set\r\n";
+                else
+                    response = ":server 332 " + client->getNickname() + " " + channelName + " :topic is now: " + it->getTopic() + "\r\n";
+
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+                return;
+            }
+
+            // Topic is being changed - check if user is in the channel
+            if (!it->hasClient(client)) {
+                std::string response = ":server 442 " + client->getNickname() + " " + channelName + " :You're not on that channel\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+                return;
+            }
+
+            // Check if +t is set and client is not an operator
+            if (it->isTopicRestricted() && !it->isOperator(client)) {
+                std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not channel operator\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+                return;
+            }
+
+            // Set the topic
+            it->setTopic(topic);
+
+            // Notify all clients in the channel with clearer message
+            std::string topicMsg = ":" + client->getNickname() + " TOPIC " + channelName + " :topic is now: " + topic + "\r\n";
+            const std::vector<Client*>& clients = it->getClients();
+            for (size_t i = 0; i < clients.size(); ++i) {
+                clients[i]->addToOutputBuffer(topicMsg);
+                enableWriteEvent(clients[i]->getFd());
+            }
+            return;
+        }
+    }
+
+    // Channel not found
+    std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
+    response += " " + channelName + " :No such channel\r\n";
+    client->addToOutputBuffer(response);
+    enableWriteEvent(client->getFd());
+}
+
+
 
 void Server::handlePass(Client* client , const std::string& params)
 {
@@ -418,56 +950,53 @@ void Server::handleNick(Client* client, const std::string& params)
 
     //inform the client
     std::string response;
-    if (oldNick.empty()) {
-        response = ":server 001 " + nickname + " :Welcome to the IRC server, " + nickname + "!\r\n";
-    } else {
-        response = ":" + oldNick + " NICK " + nickname + "\r\n";
+    if (!oldNick.empty()) {
+        std::string response = ":" + oldNick + " NICK " + nickname + "\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
     }
-    client->addToOutputBuffer(response);
-    enableWriteEvent(client->getFd());
-    
     // Check if client is now fully registered
     isClientRegistered(client);
 
 }
 
-void Server::handleUser(Client* client, const std::string& params) {
-    if (params.empty()) {
+void Server::handleUser(Client* client, const std::string& params)
+{
+    if (countArguments(params) != 4) {
         std::string response = ":server 461 " + (client->getNickname().empty() ? "*" : client->getNickname());
-        response += " USER :Not enough parameters\r\n";
+        response += " USER :Invalid number of parameters\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
         return;
     }
-    std::string username;
-    std::string realname;
 
-    size_t firstSpace = params.find(' ');
-    if (firstSpace != std::string::npos) {
-        username = params.substr(0, firstSpace);
-
-        size_t colonPos = params.find(':', firstSpace);
-        if (colonPos != std::string::npos) {
-            realname = params.substr(colonPos + 1);
-        }
-    } else {
-        username = params;
+    // Extract the parts using a stream
+    std::istringstream iss(params);
+    std::string username, hostname, servername, realname;
+    iss >> username >> hostname >> servername;
+    std::getline(iss, realname);
+    if (realname.empty() || realname[1] != ':') {
+        std::string response = ":server 461 " + (client->getNickname().empty() ? "*" : client->getNickname());
+        response += " USER :Real name must start with ':'\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
     }
+    realname = realname.erase(0, 1); // Remove the leading ':'  
 
+    // Set values
     client->setUsername(username);
-    if (!realname.empty()) {
-        client->setRealname(realname);  // Now using the setter
-    }
-    
-    std::cout << BLUE << "✓ Client " << client->getFd() << " set username: " << username << RESET << std::endl;
-    if (!realname.empty()) {
-        std::cout << BLUE << "✓ Client " << client->getFd() << " set realname: " << realname << RESET << std::endl;
-    }
-    
-    // Check if client is now fully registered
-    isClientRegistered(client);
+    client->setRealname(realname);
 
+    std::cout << BLUE << "✓ Client " << client->getFd() << " set username: " 
+              << (client->getUsername().empty() ? "None" : client->getUsername()) << RESET << std::endl;
+    std::cout << BLUE << "✓ Client " << client->getFd() << " set realname: "
+              << (client->getRealname().empty() ? "None" : client->getRealname()) << RESET << std::endl;
+
+    // Final registration check
+    isClientRegistered(client);
 }
+
 
 bool Server::isClientRegistered(Client* client) {
     // Debug output with color
@@ -506,4 +1035,20 @@ bool Server::isClientRegistered(Client* client) {
         return true;
     }
     return false;
+}
+
+int countArguments(const std::string& params) {
+    int count = 0;
+    bool inArg = false;
+
+    for (size_t i = 0; i < params.size(); ++i) {
+        if (!isspace(params[i]) && !inArg) {
+            inArg = true;
+            ++count;
+        } else if (isspace(params[i])) {
+            inArg = false;
+        }
+    }
+
+    return count;
 }

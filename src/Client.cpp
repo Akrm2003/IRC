@@ -36,6 +36,10 @@ void Client::setUsername(const std::string& username) {
     _username = username;
 }
 
+void Client::setRealname(const std::string& realname) {
+    _realname = realname;
+}
+
 void Client::setAuthenticated(bool auth) {
     _authenticated = auth;
 }
@@ -97,10 +101,6 @@ bool Client::hasDataToSend() const {
 
 const std::string& Client::getRealname() const {
     return _realname;
-}
-
-void Client::setRealname(const std::string& realname) {
-    _realname = realname;
 }
 
 bool Client::isRegistered() const {
