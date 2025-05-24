@@ -41,7 +41,7 @@ private:
     std::string _password;               // Password for clients to connect (authentication)
     int _serverSocket;                   // Main server socket file descriptor
 
-    std::vector<Client> _clients;        // List of all connected clients
+    std::vector<Client *> _clients;        // List of all connected clients
     std::vector<pollfd> _pollfds;        // List of pollfd structs used to monitor file descriptors (server + clients)
     std::vector<Channel> _channels;      // List of channels (not used yet, but can be added later)
     bool _running;                       // Indicates if server is running

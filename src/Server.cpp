@@ -35,9 +35,9 @@ Server::~Server() {
 
 Client* Server::getClientByNickname(const std::string& nickname) 
 {
-    for (std::vector<Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if (it->getNickname() == nickname) {
-            return &(*it);
+    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
+        if ((*it)->getNickname() == nickname) {
+            return *it;
         }
     }
     return NULL;  // Client not found
@@ -167,7 +167,7 @@ void Server::acceptClient() {
     // Create and store a Client object
     char clientIP[INET_ADDRSTRLEN]; // is the e maximum size required to store an IPv4 address in the standard "dotted-decimal" notation (like "192.168.0.1")
     inet_ntop(AF_INET, &(clientAddr.sin_addr), clientIP, INET_ADDRSTRLEN);
-    Client newClient(clientFd, clientIP);
+    Client *newClient = new Client(clientFd, clientIP);
     _clients.push_back(newClient);
 
     std::cout << BOLD << GREEN << "✓ New client connected from " << clientIP << " [fd: " << clientFd << "]" << RESET << std::endl;
@@ -223,8 +223,8 @@ void Server::handleClientDisconnect(int fd) {
     }
 
     // Remove from clients vector
-    for (std::vector<Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if (it->getFd() == fd) {
+    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
+        if ((*it)->getFd() == fd) {
             _clients.erase(it);
             break;
         }
@@ -318,9 +318,9 @@ void Server::handleClientOutput(int fd) {
 }
 
 Client* Server::getClientByFd(int fd) {
-    for (std::vector<Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if (it->getFd() == fd) {
-            return &(*it);
+    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
+        if ((*it)->getFd() == fd) {
+            return (*it);
         }
     }
     return NULL;  // Client not found
@@ -705,7 +705,8 @@ void Server::processCommand(Client* client , const std::string& message)
     {
         command = message.substr(0 , pos);
         params = message.substr(pos + 1);
-    }else{
+    }
+    else{
         command = message;
         params = "";
     }
@@ -954,8 +955,8 @@ void Server::handleNick(Client* client, const std::string& params)
         nickname = nickname.substr(0, spacePos);
     }
       // Check if nickname is already in use
-    for (std::vector<Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if (it->getNickname() == nickname && &(*it) != client) {
+    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
+        if ((*it)->getNickname() == nickname && (*it) != client) {
             std::string response = ":server 433 " + (client->getNickname().empty() ? "*" : client->getNickname());
             response += " " + nickname + " :Nickname is already in use\r\n";
             client->addToOutputBuffer(response);
