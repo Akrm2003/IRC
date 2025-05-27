@@ -5,46 +5,53 @@
 #include <cstring>
 #include <cerrno>
 #include <sstream>
-Server::Server(const char* port, const char* password) : _running(false) {
+Server::Server(const char *port, const char *password) : _running(false)
+{
     _port = std::atoi(port);
-    if (_port <= 0 || _port > 65535) 
+    if (_port <= 0 || _port > 65535)
     {
         throw std::runtime_error("Invalid port number");
     }
     _password = password;
-    if (_password.empty()) 
+    if (_password.empty())
     {
         throw std::runtime_error("Password cannot be empty");
     }
     _serverSocket = -1;
 }
 
-Server::~Server() {
+Server::~Server()
+{
     // Close server socket if open
-    if (_serverSocket != -1) {
+    if (_serverSocket != -1)
+    {
         close(_serverSocket);
     }
 
     // Close all client connections
-    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
-        if (it->fd >= 0 && it->fd != _serverSocket) {
+    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it)
+    {
+        if (it->fd >= 0 && it->fd != _serverSocket)
+        {
             close(it->fd);
         }
     }
 }
 
-Client* Server::getClientByNickname(const std::string& nickname) 
+Client *Server::getClientByNickname(const std::string &nickname)
 {
-    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if ((*it)->getNickname() == nickname) {
+    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it)
+    {
+        if ((*it)->getNickname() == nickname)
+        {
             return *it;
         }
     }
-    return NULL;  // Client not found
+    return NULL; // Client not found
 }
 
-
-void Server::start() {
+void Server::start()
+{
     setupSocket();
     bindSocket();
     listenSocket();
@@ -56,7 +63,7 @@ void Server::start() {
     _pollfds.push_back(serverPollfd);
 
     _running = true;
-    
+
     // Display a nice ASCII art banner
     std::cout << BOLD << CYAN << "\n";
     std::cout << "  ╔══════════════════════════════════════════╗\n";
@@ -68,20 +75,24 @@ void Server::start() {
     std::cout << RESET;
 
     // Infinite loop that checks for events on sockets
-    while (_running) {
+    while (_running)
+    {
         handleEvents(); // Use poll to monitor all fds (server + clients)
     }
 }
 
-void Server::setupSocket() {
+void Server::setupSocket()
+{
     _serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (_serverSocket == -1) {
+    if (_serverSocket == -1)
+    {
         throw std::runtime_error("Failed to create socket: " + std::string(strerror(errno)));
     }
 
     // Allow address reuse to avoid "address already in use" error on restart
     int opt = 1;
-    if (setsockopt(_serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+    if (setsockopt(_serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
+    {
         close(_serverSocket);
         throw std::runtime_error("Failed to set socket options: " + std::string(strerror(errno)));
     }
@@ -89,67 +100,80 @@ void Server::setupSocket() {
     setNonBlocking(_serverSocket); // Server socket must be non-blocking to avoid getting stuck
 }
 
-void Server::bindSocket() {
+void Server::bindSocket()
+{
     struct sockaddr_in serverAddr;
     std::memset(&serverAddr, 0, sizeof(serverAddr));
 
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY;      // Listen on all interfaces
-    serverAddr.sin_port = htons(_port);           // Set port
+    serverAddr.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
+    serverAddr.sin_port = htons(_port);      // Set port
 
-    if (bind(_serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+    if (bind(_serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == -1)
+    {
         close(_serverSocket);
         throw std::runtime_error("Failed to bind socket: " + std::string(strerror(errno)));
     }
 }
 
-void Server::listenSocket() {
-    if (listen(_serverSocket, 5) == -1) {
+void Server::listenSocket()
+{
+    if (listen(_serverSocket, 5) == -1)
+    {
         close(_serverSocket);
         throw std::runtime_error("Failed to listen on socket: " + std::string(strerror(errno)));
     }
 }
 
 // 🔁 This is the heart of the event loop
-void Server::handleEvents() {
+void Server::handleEvents()
+{
     // poll blocks until there's activity on any fd in _pollfds
     int activity = poll(&_pollfds[0], _pollfds.size(), -1); // -1 = wait forever
 
-    if (activity < 0) {
+    if (activity < 0)
+    {
         if (errno == EINTR)
             return; // poll was interrupted by signal, just try again
         throw std::runtime_error("Poll failed: " + std::string(strerror(errno)));
     }
 
     // Check if the server socket has an event (i.e., new incoming connection)
-    if (_pollfds[0].revents & POLLIN) 
+    if (_pollfds[0].revents & POLLIN)
     {
         acceptClient(); // Accept the new client connection
     }
 
     // Check all other file descriptors (clients)
-    for (size_t i = 1; i < _pollfds.size(); i++) {
-    if (_pollfds[i].revents & POLLIN) {
-        // Client sent data to us
-        handleClientMessage(_pollfds[i].fd);
+    for (size_t i = 1; i < _pollfds.size(); i++)
+    {
+        if (_pollfds[i].revents & POLLIN)
+        {
+            // Client sent data to us
+            handleClientMessage(_pollfds[i].fd);
+        }
+        if (_pollfds[i].revents & POLLOUT)
+        { // Changed from 'else if' to 'if'
+            handleClientOutput(_pollfds[i].fd);
+        }
+        if (_pollfds[i].revents & (POLLHUP | POLLERR | POLLNVAL))
+        {
+            // Client disconnected or error occurred
+            handleClientDisconnect(_pollfds[i].fd);
+        }
     }
-    if (_pollfds[i].revents & POLLOUT) {  // Changed from 'else if' to 'if'
-        handleClientOutput(_pollfds[i].fd);
-    }
-    if (_pollfds[i].revents & (POLLHUP | POLLERR | POLLNVAL)) {
-        // Client disconnected or error occurred
-        handleClientDisconnect(_pollfds[i].fd);
-    }
-}
 }
 
-void Server::acceptClient() {
+void Server::acceptClient()
+{
     struct sockaddr_in clientAddr;
     socklen_t clientAddrLen = sizeof(clientAddr);
 
-    int clientFd = accept(_serverSocket, (struct sockaddr*)&clientAddr, &clientAddrLen);
-    if (clientFd == -1) {
-        if (errno != EWOULDBLOCK && errno != EAGAIN) {
+    int clientFd = accept(_serverSocket, (struct sockaddr *)&clientAddr, &clientAddrLen);
+    if (clientFd == -1)
+    {
+        if (errno != EWOULDBLOCK && errno != EAGAIN)
+        {
             std::cerr << "Failed to accept connection: " << strerror(errno) << std::endl;
         }
         return;
@@ -177,54 +201,64 @@ void Server::acceptClient() {
     sendToClient(clientFd, welcomeMsg);
 }
 
-void Server::handleClientMessage(int fd) {
+void Server::handleClientMessage(int fd)
+{
     char buffer[1024];
     int bytesRead = recv(fd, buffer, sizeof(buffer) - 1, 0);
-    
-    if (bytesRead <= 0) {
-        if (bytesRead == 0 || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+
+    if (bytesRead <= 0)
+    {
+        if (bytesRead == 0 || (errno != EWOULDBLOCK && errno != EAGAIN))
+        {
             // Connection closed or error
             handleClientDisconnect(fd);
         }
         return;
     }
-    
-    buffer[bytesRead] = '\0';  // Null terminate the buffer
-    
+
+    buffer[bytesRead] = '\0'; // Null terminate the buffer
+
     // Find the client
-    Client* client = getClientByFd(fd);
-    if (!client) {
+    Client *client = getClientByFd(fd);
+    if (!client)
+    {
         std::cerr << BG_RED << WHITE << " ERROR " << RESET << " " << RED << "Client not found for fd " << fd << RESET << std::endl;
         return;
     }
-    
+
     // Add the received data to the client's input buffer
     client->appendToInputBuffer(buffer);
-    
+
     // Process any complete messages in the buffer
-    while (client->hasCompleteMessage()) { // NICK user1\r\nUSER user1 0 * :Real Name\r\n it will always continue until no cammand remain 
+    while (client->hasCompleteMessage())
+    { // NICK user1\r\nUSER user1 0 * :Real Name\r\n it will always continue until no cammand remain
         std::string message = client->getNextMessage();
         std::cout << CYAN << "← Received from client " << fd << ": " << RESET << message << std::endl;
-        
-         // Process command instead of just echoing back
+
+        // Process command instead of just echoing back
         processCommand(client, message);
     }
 }
 
-void Server::handleClientDisconnect(int fd) {
+void Server::handleClientDisconnect(int fd)
+{
     std::cout << BOLD << RED << "✗ Client " << fd << " disconnected" << RESET << std::endl;
 
     // Remove from pollfds vector
-    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
-        if (it->fd == fd) {
+    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it)
+    {
+        if (it->fd == fd)
+        {
             _pollfds.erase(it);
             break;
         }
     }
 
     // Remove from clients vector
-    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if ((*it)->getFd() == fd) {
+    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it)
+    {
+        if ((*it)->getFd() == fd)
+        {
             _clients.erase(it);
             break;
         }
@@ -234,44 +268,55 @@ void Server::handleClientDisconnect(int fd) {
     close(fd);
 }
 
-void Server::setNonBlocking(int fd) {
+void Server::setNonBlocking(int fd)
+{
     int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
+    if (flags == -1)
+    {
         throw std::runtime_error("Failed to get socket flags: " + std::string(strerror(errno)));
     }
 
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+    {
         throw std::runtime_error("Failed to set socket non-blocking: " + std::string(strerror(errno)));
     }
 }
 
-void Server::sendToClient(int fd, const std::string& message) {
-    Client* client = getClientByFd(fd);
-    if (!client) {
+void Server::sendToClient(int fd, const std::string &message)
+{
+    Client *client = getClientByFd(fd);
+    if (!client)
+    {
         std::cerr << BG_RED << WHITE << " ERROR " << RESET << " " << RED << "Client not found for fd " << fd << RESET << std::endl;
         return;
     }
-    
+
     // Add the message to the client's output buffer
     client->addToOutputBuffer(message);
-    
+
     // Enable write events for this client
     enableWriteEvent(fd);
 }
 
- void Server::enableWriteEvent(int fd) {
-    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
-        if (it->fd == fd) {
-            it->events |= POLLOUT;  // maeen just read it and shut up , i know u will ask what is this weird syntax 
+void Server::enableWriteEvent(int fd)
+{
+    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it)
+    {
+        if (it->fd == fd)
+        {
+            it->events |= POLLOUT; // maeen just read it and shut up , i know u will ask what is this weird syntax
             break;
         }
     }
 }
 
-void Server::disableWriteEvent(int fd) {
-    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
-        if (it->fd == fd) {
-            it->events &= ~POLLOUT;  // Maeen shut up again and dont ask about the ~ its just mean
+void Server::disableWriteEvent(int fd)
+{
+    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it)
+    {
+        if (it->fd == fd)
+        {
+            it->events &= ~POLLOUT; // Maeen shut up again and dont ask about the ~ its just mean
             break;
         }
     }
@@ -279,36 +324,45 @@ void Server::disableWriteEvent(int fd) {
 
 //
 
-void Server::handleClientOutput(int fd) {
-    Client* client = getClientByFd(fd); //  // Find a client by their file descriptor
-    
-    if (!client || !client->hasDataToSend()) {
+void Server::handleClientOutput(int fd)
+{
+    Client *client = getClientByFd(fd); //  // Find a client by their file descriptor
+
+    if (!client || !client->hasDataToSend())
+    {
         // No client found or no data to send, disable write events
         disableWriteEvent(fd);
         return;
     }
-    
+
     // Get the data from the client's output buffer
     std::string dataToSend = client->getOutputBuffer();
-    
+
     // Try to send it
     int bytesSent = send(fd, dataToSend.c_str(), dataToSend.size(), 0);
-    
-    if (bytesSent > 0) {
+
+    if (bytesSent > 0)
+    {
         std::cout << CYAN << "→ Sent " << bytesSent << " bytes to client " << fd << RESET << std::endl;
         // Successfully sent some data
         client->clearOutputBuffer();
-        
+
         // If we didn't send everything, put the remainder back in the buffer
-        if (bytesSent < (int)dataToSend.size()) {
+        if (bytesSent < (int)dataToSend.size())
+        {
             client->addToOutputBuffer(dataToSend.substr(bytesSent));
-        } else {
+        }
+        else
+        {
             // All data sent, disable write events
             disableWriteEvent(fd);
         }
-    } else if (bytesSent < 0) {
+    }
+    else if (bytesSent < 0)
+    {
         // Error occurred
-        if (errno != EWOULDBLOCK && errno != EAGAIN) {
+        if (errno != EWOULDBLOCK && errno != EAGAIN)
+        {
             // A real error, not just "would block"
             std::cerr << BG_RED << WHITE << " ERROR " << RESET << " " << RED << "Error sending data: " << strerror(errno) << RESET << std::endl;
             handleClientDisconnect(fd);
@@ -317,20 +371,25 @@ void Server::handleClientOutput(int fd) {
     }
 }
 
-Client* Server::getClientByFd(int fd) {
-    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if ((*it)->getFd() == fd) {
+Client *Server::getClientByFd(int fd)
+{
+    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it)
+    {
+        if ((*it)->getFd() == fd)
+        {
             return (*it);
         }
     }
-    return NULL;  // Client not found
+    return NULL; // Client not found
 }
 
-void Server::handlePart(Client* client, const std::string& channelNameRaw, const std::string& partMessage) {
+void Server::handlePart(Client *client, const std::string &channelNameRaw, const std::string &partMessage)
+{
     std::string channelName = channelNameRaw;
 
     // Validate channel name: must start with '#' or '&' and have at least 2 chars
-    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1]) {
+    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1])
+    {
         std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " " + channelName + " :No such channel\r\n";
         client->addToOutputBuffer(response);
@@ -339,10 +398,13 @@ void Server::handlePart(Client* client, const std::string& channelNameRaw, const
     }
 
     // Look for the channel in the server's list
-    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
-        if (it->getName() == channelName) {
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+    {
+        if (it->getName() == channelName)
+        {
             // Channel found: try to remove the client from the channel
-            if (it->removeClient(client)) {
+            if (it->removeClient(client))
+            {
                 // Prepare PART message to notify all clients
                 std::string partMsg = ":" + client->getNickname() + " PART " + channelName;
                 if (!partMessage.empty())
@@ -353,9 +415,11 @@ void Server::handlePart(Client* client, const std::string& channelNameRaw, const
                 client->addToOutputBuffer(partMsg);
 
                 // Notify all other clients in the channel
-                const std::vector<Client*>& clients = it->getClients();
-                for (size_t i = 0; i < clients.size(); ++i) {
-                    if (clients[i] != client) {
+                const std::vector<Client *> &clients = it->getClients();
+                for (size_t i = 0; i < clients.size(); ++i)
+                {
+                    if (clients[i] != client)
+                    {
                         clients[i]->addToOutputBuffer(partMsg);
                         enableWriteEvent(clients[i]->getFd());
                     }
@@ -364,11 +428,13 @@ void Server::handlePart(Client* client, const std::string& channelNameRaw, const
                 enableWriteEvent(client->getFd());
 
                 // Remove the channel if it is now empty
-                if (it->getClients().empty()) {
+                if (it->getClients().empty())
+                {
                     _channels.erase(it);
                 }
-
-            } else {
+            }
+            else
+            {
                 // Client wasn't in the channel, send error 442 (You're not on that channel)
                 std::string response = ":server 442 " + (client->getNickname().empty() ? "*" : client->getNickname());
                 response += " " + channelName + " :You're not on that channel\r\n";
@@ -386,14 +452,14 @@ void Server::handlePart(Client* client, const std::string& channelNameRaw, const
     enableWriteEvent(client->getFd());
 }
 
-
-
 // NOTE: Now accepts the actual message content from the user, instead of a hardcoded string
-void Server::handlePrivmsg(Client* client, const std::string& channelNameRaw, const std::string& messageContent) {
+void Server::handlePrivmsg(Client *client, const std::string &channelNameRaw, const std::string &messageContent)
+{
     std::string channelName = channelNameRaw;
 
     // Validate channel name as before
-    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1]) {
+    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1])
+    {
         std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " " + channelName + " :No such channel\r\n";
         client->addToOutputBuffer(response);
@@ -402,10 +468,13 @@ void Server::handlePrivmsg(Client* client, const std::string& channelNameRaw, co
     }
 
     // Find the channel in the server list
-    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
-        if (it->getName() == channelName) {
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+    {
+        if (it->getName() == channelName)
+        {
 
-            if (!it->hasClient(client)) {
+            if (!it->hasClient(client))
+            {
                 std::string response = ":server 404 " + client->getNickname() + " " + channelName + " :Cannot send to channel\r\n";
                 client->addToOutputBuffer(response);
                 enableWriteEvent(client->getFd());
@@ -415,8 +484,9 @@ void Server::handlePrivmsg(Client* client, const std::string& channelNameRaw, co
             std::string message = ":" + client->getNickname() + " PRIVMSG " + channelName + " :" + messageContent + "\r\n";
 
             // Send message to all clients in the channel
-            const std::vector<Client*>& clients = it->getClients();
-            for (size_t i = 0; i < clients.size(); ++i) {
+            const std::vector<Client *> &clients = it->getClients();
+            for (size_t i = 0; i < clients.size(); ++i)
+            {
                 clients[i]->addToOutputBuffer(message);
                 enableWriteEvent(clients[i]->getFd());
             }
@@ -433,15 +503,15 @@ void Server::handlePrivmsg(Client* client, const std::string& channelNameRaw, co
     enableWriteEvent(client->getFd());
 }
 
-
-void Server::handleKick(Client* client, const std::string& params)
+void Server::handleKick(Client *client, const std::string &params)
 {
     std::istringstream iss(params);
     std::string channelName, targetNick;
     iss >> channelName >> targetNick;
 
     // Check for required parameters
-    if (channelName.empty() || targetNick.empty()) {
+    if (channelName.empty() || targetNick.empty())
+    {
         std::string response = ":server 461 " + client->getNickname() + " KICK :Not enough parameters\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
@@ -449,7 +519,8 @@ void Server::handleKick(Client* client, const std::string& params)
     }
 
     // Check valid channel name format
-    if ((channelName[0] != '#' && channelName[0] != '&') || channelName.size() < 2) {
+    if ((channelName[0] != '#' && channelName[0] != '&') || channelName.size() < 2)
+    {
         std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
@@ -457,15 +528,18 @@ void Server::handleKick(Client* client, const std::string& params)
     }
 
     // Find the channel
-    Channel* targetChannel = nullptr;
-    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
-        if (it->getName() == channelName) {
+    Channel *targetChannel = nullptr;
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+    {
+        if (it->getName() == channelName)
+        {
             targetChannel = &(*it);
             break;
         }
     }
 
-    if (!targetChannel) {
+    if (!targetChannel)
+    {
         std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
@@ -473,7 +547,8 @@ void Server::handleKick(Client* client, const std::string& params)
     }
 
     // Check if the sender is a channel operator
-    if (!targetChannel->isOperator(client)) {
+    if (!targetChannel->isOperator(client))
+    {
         std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not a channel operator\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
@@ -481,8 +556,9 @@ void Server::handleKick(Client* client, const std::string& params)
     }
 
     // Find the target client by nickname
-    Client* targetClient = getClientByNickname(targetNick); // You need this helper
-    if (!targetClient) {
+    Client *targetClient = getClientByNickname(targetNick); // You need this helper
+    if (!targetClient)
+    {
         std::string response = ":server 401 " + client->getNickname() + " " + targetNick + " :No such nick\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
@@ -490,7 +566,8 @@ void Server::handleKick(Client* client, const std::string& params)
     }
 
     // Check if the target is in the channel
-    if (!targetChannel->hasClient(targetClient)) {
+    if (!targetChannel->hasClient(targetClient))
+    {
         std::string response = ":server 441 " + client->getNickname() + " " + targetNick + " " + channelName + " :They aren't on that channel\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
@@ -499,8 +576,9 @@ void Server::handleKick(Client* client, const std::string& params)
 
     // Notify all users in the channel
     std::string kickMsg = ":" + client->getNickname() + " KICK " + channelName + " " + targetNick + "\r\n";
-    const std::vector<Client*>& clients = targetChannel->getClients();
-    for (size_t i = 0; i < clients.size(); ++i) {
+    const std::vector<Client *> &clients = targetChannel->getClients();
+    for (size_t i = 0; i < clients.size(); ++i)
+    {
         clients[i]->addToOutputBuffer(kickMsg);
         enableWriteEvent(clients[i]->getFd());
     }
@@ -509,31 +587,36 @@ void Server::handleKick(Client* client, const std::string& params)
     targetChannel->removeClient(targetClient);
 }
 
-void Server::handleMode(Client* client, const std::string& params)
+void Server::handleMode(Client *client, const std::string &params)
 {
     std::vector<std::string> args;
     std::istringstream iss(params);
     std::string token;
-    while (iss >> token) {
+    while (iss >> token)
+    {
         args.push_back(token);
     }
 
-    if (args.empty()) {
+    if (args.empty())
+    {
         return; // no parameters
     }
-    const std::string& channelName = args[0];
+    const std::string &channelName = args[0];
 
     // Validate channel name and find channel (your existing code)...
 
-    Channel* targetChannel = nullptr;
-    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
-        if (it->getName() == channelName) {
+    Channel *targetChannel = nullptr;
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+    {
+        if (it->getName() == channelName)
+        {
             targetChannel = &(*it);
             break;
         }
     }
 
-    if (!targetChannel) {
+    if (!targetChannel)
+    {
         std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
@@ -542,45 +625,59 @@ void Server::handleMode(Client* client, const std::string& params)
 
     // If only channel name given, show current modes (your existing code)...
 
-    if (args.size() == 1) {
+    if (args.size() == 1)
+    {
         // show current modes (as you already have)
         // ...
         return;
     }
 
     // Check if client is operator before allowing mode changes
-    if (!targetChannel->isOperator(client)) {
+    if (!targetChannel->isOperator(client))
+    {
         std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not a channel operator\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
         return;
     }
 
-    const std::string& modeStr = args[1];
+    const std::string &modeStr = args[1];
     bool adding = true;
-    size_t nickArgIndex = 2;  // index for the nickname when mode requires one
+    size_t nickArgIndex = 2; // index for the nickname when mode requires one
 
-    for (size_t i = 0; i < modeStr.size(); ++i) {
+    for (size_t i = 0; i < modeStr.size(); ++i)
+    {
         char mode = modeStr[i];
-        if (mode == '+') {
+        if (mode == '+')
+        {
             adding = true;
-        } else if (mode == '-') {
+        }
+        else if (mode == '-')
+        {
             adding = false;
-        } else if (mode == 'i') {
+        }
+        else if (mode == 'i')
+        {
             targetChannel->setInviteOnly(adding);
-        } else if (mode == 't') {
+        }
+        else if (mode == 't')
+        {
             targetChannel->setTopicRestricted(adding);
-        } else if (mode == 'o') {
+        }
+        else if (mode == 'o')
+        {
             // 'o' mode requires a nickname parameter
-            if (nickArgIndex >= args.size()) {
+            if (nickArgIndex >= args.size())
+            {
                 // No nickname provided for +o or -o, ignore or send error
                 continue;
             }
             std::string targetNick = args[nickArgIndex++];
-            
+
             // Find client in channel by nickname
-            Client* targetClient = getClientByNickname(targetNick);
-            if (!targetClient) {
+            Client *targetClient = getClientByNickname(targetNick);
+            if (!targetClient)
+            {
                 // Send error: No such nick in channel
                 std::string response = ":server 401 " + client->getNickname() + " " + targetNick + " :No such nick/channel\r\n";
                 client->addToOutputBuffer(response);
@@ -588,12 +685,44 @@ void Server::handleMode(Client* client, const std::string& params)
                 continue;
             }
 
-            if (adding) {
+            if (adding)
+            {
                 targetChannel->addOperator(targetClient);
-            } else {
+            }
+            else
+            {
                 targetChannel->removeOperator(targetClient);
             }
-        } else {
+        }
+        else if (mode == 'k')
+        {
+            if (adding)
+            {
+                if (nickArgIndex >= args.size())
+                    continue;
+                targetChannel->setPassword(args[nickArgIndex++]);
+            }
+            else
+            {
+                targetChannel->setPassword("");
+            }
+        }
+        else if (mode == 'l')
+        {
+            if (adding)
+            {
+                if (nickArgIndex >= args.size())
+                    continue;
+                int limit = std::atoi(args[nickArgIndex++].c_str());
+                targetChannel->setUserLimit(limit);
+            }
+            else
+            {
+                targetChannel->setUserLimit(0);
+            }
+        }
+        else
+        {
             // Unknown mode, ignore or send error
         }
     }
@@ -601,28 +730,30 @@ void Server::handleMode(Client* client, const std::string& params)
     // Broadcast mode change
     std::string modeChangeMsg = ":" + client->getNickname() + " MODE " + channelName + " " + modeStr;
     // Also add the nicknames for modes like +o in the message
-    if (modeStr.find('o') != std::string::npos) {
-        for (size_t i = 2; i < args.size(); ++i) {
+    if (modeStr.find('o') != std::string::npos)
+    {
+        for (size_t i = 2; i < args.size(); ++i)
+        {
             modeChangeMsg += " " + args[i];
         }
     }
     modeChangeMsg += "\r\n";
 
-    const std::vector<Client*>& clients = targetChannel->getClients();
-    for (size_t i = 0; i < clients.size(); ++i) {
+    const std::vector<Client *> &clients = targetChannel->getClients();
+    for (size_t i = 0; i < clients.size(); ++i)
+    {
         clients[i]->addToOutputBuffer(modeChangeMsg);
         enableWriteEvent(clients[i]->getFd());
     }
 }
 
-
-
-void Server::handleJoin(Client* client, const std::string& channelNameRaw)
+void Server::handleJoin(Client *client, const std::string &channelNameRaw)
 {
     std::string channelName = channelNameRaw;
 
     // Validate channel name
-    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1]) {
+    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1])
+    {
         std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " " + channelName + " :No such channel\r\n";
         client->addToOutputBuffer(response);
@@ -631,25 +762,30 @@ void Server::handleJoin(Client* client, const std::string& channelNameRaw)
     }
 
     // Check if the channel already exists
-    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
-        if (it->getName() == channelName) {
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+    {
+        if (it->getName() == channelName)
+        {
             // Channel already exists, try to add the client
-            if (it->addClient(client)) {
+            if (it->addClient(client))
+            {
                 std::string joinMsg = ":" + client->getNickname() + " JOIN " + channelName + "\r\n";
 
                 // Notify the joining client
                 client->addToOutputBuffer(joinMsg);
 
                 // Send topic if exists
-                if (!it->getTopic().empty()) {
+                if (!it->getTopic().empty())
+                {
                     std::string topicReply = ":server 332 " + client->getNickname() + " " + channelName + " :" + it->getTopic() + "\r\n";
                     client->addToOutputBuffer(topicReply);
                 }
 
                 // Send NAMES list
                 std::string namesReply = ":server 353 " + client->getNickname() + " = " + channelName + " :";
-                const std::vector<Client*>& clients = it->getClients();
-                for (size_t i = 0; i < clients.size(); ++i) {
+                const std::vector<Client *> &clients = it->getClients();
+                for (size_t i = 0; i < clients.size(); ++i)
+                {
                     namesReply += clients[i]->getNickname() + " ";
                 }
                 namesReply += "\r\n";
@@ -659,15 +795,19 @@ void Server::handleJoin(Client* client, const std::string& channelNameRaw)
                 client->addToOutputBuffer(endOfNames);
 
                 // Broadcast JOIN to other clients
-                for (size_t i = 0; i < clients.size(); ++i) {
-                    if (clients[i] != client) {
+                for (size_t i = 0; i < clients.size(); ++i)
+                {
+                    if (clients[i] != client)
+                    {
                         clients[i]->addToOutputBuffer(joinMsg);
                         enableWriteEvent(clients[i]->getFd());
                     }
                 }
 
                 enableWriteEvent(client->getFd());
-            } else {
+            }
+            else
+            {
                 // Client is already in the channel
                 std::string response = ":server 442 " + (client->getNickname().empty() ? "*" : client->getNickname());
                 response += " " + channelName + " :You're already on that channel\r\n";
@@ -695,52 +835,56 @@ void Server::handleJoin(Client* client, const std::string& channelNameRaw)
     enableWriteEvent(client->getFd());
 }
 
-void Server::processCommand(Client* client , const std::string& message)
+void Server::processCommand(Client *client, const std::string &message)
 {
     std::string command;
     std::string params;
 
     size_t pos = message.find(' ');
-    if(pos != std::string::npos)
+    if (pos != std::string::npos)
     {
-        command = message.substr(0 , pos);
+        command = message.substr(0, pos);
         params = message.substr(pos + 1);
     }
-    else{
+    else
+    {
         command = message;
         params = "";
     }
 
-    for(size_t i = 0; i < command.size(); i++)
+    for (size_t i = 0; i < command.size(); i++)
     {
         command[i] = toupper(command[i]);
     }
 
-    std::cout << YELLOW << "⮞ " << (client->getNickname().empty() ? "Anonymous" : client->getNickname()) 
-              << " [" << client->getFd() << "]" << RESET << ": " 
+    std::cout << YELLOW << "⮞ " << (client->getNickname().empty() ? "Anonymous" : client->getNickname())
+              << " [" << client->getFd() << "]" << RESET << ": "
               << BOLD << command << RESET << " " << params << std::endl;
 
-    if(command == "PASS")
-        handlePass(client , params);
-    else if(command == "NICK")
+    if (command == "PASS")
+        handlePass(client, params);
+    else if (command == "NICK")
     {
         std::string nickname = params;
         size_t spacePos = nickname.find(' ');
-        if (spacePos != std::string::npos) {
+        if (spacePos != std::string::npos)
+        {
             nickname = nickname.substr(0, spacePos);
         }
         handleNick(client, nickname);
     }
-    else if(command == "USER"){
-        handleUser(client , params);
+    else if (command == "USER")
+    {
+        handleUser(client, params);
     }
-    else if(command == "PING"){
+    else if (command == "PING")
+    {
         std::string response = ":server PONG " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " :Pong\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
     }
-    else if(command == "CAP")
+    else if (command == "CAP")
     {
         if (params == "LS")
         {
@@ -762,9 +906,9 @@ void Server::processCommand(Client* client , const std::string& message)
             enableWriteEvent(client->getFd());
         }
     }
-    else if(client->isAuthenticated() && client->isRegistered())
+    else if (client->isAuthenticated() && client->isRegistered())
     {
-        if(command == "JOIN")
+        if (command == "JOIN")
         {
             if (params.empty())
             {
@@ -777,23 +921,27 @@ void Server::processCommand(Client* client , const std::string& message)
             else
                 handleJoin(client, params);
         }
-        else if (command == "PART") {
+        else if (command == "PART")
+        {
             std::string channelName;
             std::string partMessage;
-        
+
             size_t firstSpace = params.find(' ');
-            if (firstSpace != std::string::npos) {
+            if (firstSpace != std::string::npos)
+            {
                 channelName = params.substr(0, firstSpace);
                 partMessage = params.substr(firstSpace + 1);
                 if (!partMessage.empty() && partMessage[0] == ':')
                     partMessage = partMessage.substr(1); // remove leading colon
-            } else {
+            }
+            else
+            {
                 channelName = params; // No message, just the channel
             }
             handlePart(client, channelName, partMessage);
         }
-        
-        else if(command == "PRIVMSG")
+
+        else if (command == "PRIVMSG")
         {
             size_t spacePos = params.find(' ');
             std::string channelName = params.substr(0, spacePos);
@@ -810,38 +958,43 @@ void Server::processCommand(Client* client , const std::string& message)
             // Handle the PRIVMSG command
             handlePrivmsg(client, channelName, messageContent);
         }
-        else if(command == "TOPIC")
+        else if (command == "TOPIC")
             handleTopic(client, params);
-        else if(command == "KICK")
+        else if (command == "KICK")
             handleKick(client, params);
-        else if(command == "MODE")
+        else if (command == "MODE")
             handleMode(client, params);
-
+        else if (command == "INVITE")
+            handleInvite(client, params);
     }
-     else {
+    else
+    {
         std::string response = " :server 421 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " " + command + " : Unknown command \r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
     }
-
 }
 
-void Server::handleTopic(Client* client, const std::string& params)
+void Server::handleTopic(Client *client, const std::string &params)
 {
     std::string channelName;
     std::string topic;
 
     size_t spacePos = params.find(' ');
-    if (spacePos != std::string::npos) {
+    if (spacePos != std::string::npos)
+    {
         channelName = params.substr(0, spacePos);
         topic = params.substr(spacePos + 1);
-    } else {
+    }
+    else
+    {
         channelName = params;
     }
 
     // Validate channel name
-    if ((channelName[0] != '#' && channelName[0] != '&') || channelName.length() < 2) {
+    if ((channelName[0] != '#' && channelName[0] != '&') || channelName.length() < 2)
+    {
         std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " " + channelName + " :No such channel\r\n";
         client->addToOutputBuffer(response);
@@ -850,11 +1003,14 @@ void Server::handleTopic(Client* client, const std::string& params)
     }
 
     // Find the channel
-    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
-        if (it->getName() == channelName) {
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+    {
+        if (it->getName() == channelName)
+        {
 
             // If no topic is provided, it's a topic query
-            if (topic.empty()) {
+            if (topic.empty())
+            {
                 std::string response;
                 if (it->getTopic().empty())
                     response = ":server 331 " + client->getNickname() + " " + channelName + " :No topic is set\r\n";
@@ -867,7 +1023,8 @@ void Server::handleTopic(Client* client, const std::string& params)
             }
 
             // Topic is being changed - check if user is in the channel
-            if (!it->hasClient(client)) {
+            if (!it->hasClient(client))
+            {
                 std::string response = ":server 442 " + client->getNickname() + " " + channelName + " :You're not on that channel\r\n";
                 client->addToOutputBuffer(response);
                 enableWriteEvent(client->getFd());
@@ -875,7 +1032,8 @@ void Server::handleTopic(Client* client, const std::string& params)
             }
 
             // Check if +t is set and client is not an operator
-            if (it->isTopicRestricted() && !it->isOperator(client)) {
+            if (it->isTopicRestricted() && !it->isOperator(client))
+            {
                 std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not channel operator\r\n";
                 client->addToOutputBuffer(response);
                 enableWriteEvent(client->getFd());
@@ -887,8 +1045,9 @@ void Server::handleTopic(Client* client, const std::string& params)
 
             // Notify all clients in the channel with clearer message
             std::string topicMsg = ":" + client->getNickname() + " TOPIC " + channelName + " :topic is now: " + topic + "\r\n";
-            const std::vector<Client*>& clients = it->getClients();
-            for (size_t i = 0; i < clients.size(); ++i) {
+            const std::vector<Client *> &clients = it->getClients();
+            for (size_t i = 0; i < clients.size(); ++i)
+            {
                 clients[i]->addToOutputBuffer(topicMsg);
                 enableWriteEvent(clients[i]->getFd());
             }
@@ -903,11 +1062,9 @@ void Server::handleTopic(Client* client, const std::string& params)
     enableWriteEvent(client->getFd());
 }
 
-
-
-void Server::handlePass(Client* client , const std::string& params)
+void Server::handlePass(Client *client, const std::string &params)
 {
-    if(client->isAuthenticated())
+    if (client->isAuthenticated())
     {
         std::string response = " :server 462 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " : You may not register \n\n";
@@ -916,47 +1073,52 @@ void Server::handlePass(Client* client , const std::string& params)
         return;
     }
 
-    if (params.empty()) {
+    if (params.empty())
+    {
         std::string response = ":server 461 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " PASS :Not enough parameters\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
         return;
     }
-    if(params == _password)
+    if (params == _password)
     {
         client->setAuthenticated(true);
         std::cout << BLUE << "✓ Client " << client->getFd() << " authenticated with password" << RESET << std::endl;
         isClientRegistered(client);
-    }else {
+    }
+    else
+    {
         std::cout << RED << "✗ Client " << client->getFd() << " failed password authentication" << RESET << std::endl;
         std::string response = ":server 464 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " :Password incorrect\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
-
     }
-    
 }
 
-void Server::handleNick(Client* client, const std::string& params) 
+void Server::handleNick(Client *client, const std::string &params)
 {
-     if (params.empty()) {
+    if (params.empty())
+    {
         std::string response = ":server 431 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " :No nickname given\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
         return;
     }
-    //extract the name before the space and after the cmmand like "NICK AKRAM HELLO" We will take just akram bcz we found a space
+    // extract the name before the space and after the cmmand like "NICK AKRAM HELLO" We will take just akram bcz we found a space
     std::string nickname = params;
     size_t spacePos = nickname.find(' ');
-    if (spacePos != std::string::npos) {
+    if (spacePos != std::string::npos)
+    {
         nickname = nickname.substr(0, spacePos);
     }
-      // Check if nickname is already in use
-    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if ((*it)->getNickname() == nickname && (*it) != client) {
+    // Check if nickname is already in use
+    for (std::vector<Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it)
+    {
+        if ((*it)->getNickname() == nickname && (*it) != client)
+        {
             std::string response = ":server 433 " + (client->getNickname().empty() ? "*" : client->getNickname());
             response += " " + nickname + " :Nickname is already in use\r\n";
             client->addToOutputBuffer(response);
@@ -964,28 +1126,29 @@ void Server::handleNick(Client* client, const std::string& params)
             return;
         }
     }
-    //setting the nickname
+    // setting the nickname
 
     std::string oldNick = client->getNickname();
     client->setNickname(nickname);
-    std::cout << BLUE << "✓ Client " << client->getFd() << " set nickname: " 
+    std::cout << BLUE << "✓ Client " << client->getFd() << " set nickname: "
               << (oldNick.empty() ? "None" : oldNick) << " → " << nickname << RESET << std::endl;
 
-    //inform the client
+    // inform the client
     std::string response;
-    if (!oldNick.empty()) {
+    if (!oldNick.empty())
+    {
         response = ":" + oldNick + " NICK " + nickname + "\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
     }
     // Check if client is now fully registered
     isClientRegistered(client);
-
 }
 
-void Server::handleUser(Client* client, const std::string& params)
+void Server::handleUser(Client *client, const std::string &params)
 {
-    if (countArguments(params) != 4) {
+    if (countArguments(params) != 4)
+    {
         std::string response = ":server 461 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " USER :Invalid number of parameters\r\n";
         client->addToOutputBuffer(response);
@@ -998,20 +1161,21 @@ void Server::handleUser(Client* client, const std::string& params)
     std::string username, hostname, servername, realname;
     iss >> username >> hostname >> servername;
     std::getline(iss, realname);
-    if (realname.empty() || realname[1] != ':') {
+    if (realname.empty() || realname[1] != ':')
+    {
         std::string response = ":server 461 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " USER :Real name must start with ':'\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
         return;
     }
-    realname = realname.erase(0, 1); // Remove the leading ':'  
+    realname = realname.erase(0, 1); // Remove the leading ':'
 
     // Set values
     client->setUsername(username);
     client->setRealname(realname);
 
-    std::cout << BLUE << "✓ Client " << client->getFd() << " set username: " 
+    std::cout << BLUE << "✓ Client " << client->getFd() << " set username: "
               << (client->getUsername().empty() ? "None" : client->getUsername()) << RESET << std::endl;
     std::cout << BLUE << "✓ Client " << client->getFd() << " set realname: "
               << (client->getRealname().empty() ? "None" : client->getRealname()) << RESET << std::endl;
@@ -1020,8 +1184,8 @@ void Server::handleUser(Client* client, const std::string& params)
     isClientRegistered(client);
 }
 
-
-bool Server::isClientRegistered(Client* client) {
+bool Server::isClientRegistered(Client *client)
+{
     // Debug output with color
     std::cout << MAGENTA << "ℹ Registration status [fd: " << client->getFd() << "]" << RESET << ": "
               << "Auth=" << (client->isAuthenticated() ? GREEN "yes" : RED "no") << RESET
@@ -1029,30 +1193,32 @@ bool Server::isClientRegistered(Client* client) {
               << ", User=" << (client->getUsername().empty() ? RED "empty" : GREEN + client->getUsername()) << RESET
               << ", Registered=" << (client->isRegistered() ? GREEN "yes" : RED "no") << RESET
               << std::endl;
-    
+
     // A client is registered when they have:
     // 1. Authenticated with PASS
     // 2. Set a nickname with NICK
     // 3. Set a username with USER
-    
-    if (client->isAuthenticated() && !client->getNickname().empty() && !client->getUsername().empty()) {
+
+    if (client->isAuthenticated() && !client->getNickname().empty() && !client->getUsername().empty())
+    {
         // Check if this is the first time they're being registered
-        if (!client->isRegistered()) {
+        if (!client->isRegistered())
+        {
             client->setRegistered(true);
-            
-            std::cout << BOLD << GREEN << "★ Client " << client->getFd() 
+
+            std::cout << BOLD << GREEN << "★ Client " << client->getFd()
                       << " (" << client->getNickname() << ") is now fully registered! ★" << RESET << std::endl;
-            
+
             // Send welcome messages (IRC numeric replies 001-004)
             std::string nick = client->getNickname();
             std::string welcomeMsg = ":server 001 " + nick + " :Welcome to the IRC server " + nick + "!\r\n";
             welcomeMsg += ":server 002 " + nick + " :Your host is server, running version 1.0\r\n";
             welcomeMsg += ":server 003 " + nick + " :This server was created today\r\n";
             welcomeMsg += ":server 004 " + nick + " :server 1.0 o mtikl\r\n";
-            
+
             client->addToOutputBuffer(welcomeMsg);
             enableWriteEvent(client->getFd());
-            
+
             std::cout << "Client " << client->getFd() << " is now fully registered" << std::endl;
         }
         return true;
@@ -1060,18 +1226,85 @@ bool Server::isClientRegistered(Client* client) {
     return false;
 }
 
-int countArguments(const std::string& params) {
+int countArguments(const std::string &params)
+{
     int count = 0;
     bool inArg = false;
 
-    for (size_t i = 0; i < params.size(); ++i) {
-        if (!isspace(params[i]) && !inArg) {
+    for (size_t i = 0; i < params.size(); ++i)
+    {
+        if (!isspace(params[i]) && !inArg)
+        {
             inArg = true;
             ++count;
-        } else if (isspace(params[i])) {
+        }
+        else if (isspace(params[i]))
+        {
             inArg = false;
         }
     }
 
     return count;
+}
+
+void Server::handleInvite(Client *client, const std::string &params)
+{
+    std::istringstream iss(params);
+    std::string targetNick, channelName;
+    iss >> targetNick >> channelName;
+
+    if (targetNick.empty() || channelName.empty())
+    {
+        std::string response = ":server 461 " + client->getNickname() + " INVITE :Not enough parameters\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Find the channel
+    Channel *targetChannel = nullptr;
+    for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+    {
+        if (it->getName() == channelName)
+        {
+            targetChannel = &(*it);
+            break;
+        }
+    }
+
+    if (!targetChannel)
+    {
+        std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Check if the client is an operator
+    if (!targetChannel->isOperator(client))
+    {
+        std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not a channel operator\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Find the target client
+    Client *targetClient = getClientByNickname(targetNick);
+    if (!targetClient)
+    {
+        std::string response = ":server 401 " + client->getNickname() + " " + targetNick + " :No such nick\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Send invite message
+    std::string inviteMsg = ":" + client->getNickname() + " INVITE " + targetNick + " :" + channelName + "\r\n";
+    targetClient->addToOutputBuffer(inviteMsg);
+    enableWriteEvent(targetClient->getFd());
+
+    std::string response = ":server 341 " + client->getNickname() + " " + targetNick + " " + channelName + "\r\n";
+    client->addToOutputBuffer(response);
+    enableWriteEvent(client->getFd());
 }

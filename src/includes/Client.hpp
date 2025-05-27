@@ -5,7 +5,8 @@
 #include <vector>
 #include <iostream>
 
-class Client {
+class Client
+{
 private:
     int _fd;
     std::string _ip;
@@ -15,38 +16,52 @@ private:
     std::string _inputBuffer;
     std::string _outputBuffer;
     std::string _realname;
-    bool _registered; 
+    bool _registered;
+    bool _passAuthenticated;
+    bool _nickSet;
+    bool _userSet;
 
 public:
-    Client(int fd, const std::string& ip);
+    Client(int fd, const std::string &ip);
     ~Client();
-    
+
     // Getters
     int getFd() const;
-    const std::string& getIp() const;
-    const std::string& getNickname() const;
-    const std::string& getUsername() const;
+    const std::string &getIp() const;
+    const std::string &getNickname() const;
+    const std::string &getUsername() const;
     bool isAuthenticated() const;
-    const std::string& getRealname() const;
-    
-    // Setters
-    void setNickname(const std::string& nickname);
-    void setUsername(const std::string& username);
-    void setAuthenticated(bool auth);
-    void setRealname(const std::string& realname);
+    const std::string &getRealname() const;
 
-    //buffer management 
-    void appendToInputBuffer(const std::string& data);
-    bool hasCompleteMessage()const;
+    // Setters
+    void setNickname(const std::string &nickname);
+    void setUsername(const std::string &username);
+    void setAuthenticated(bool auth);
+    void setRealname(const std::string &realname);
+
+    // buffer management
+    void appendToInputBuffer(const std::string &data);
+    bool hasCompleteMessage() const;
     std::string getNextMessage();
-    
-    void addToOutputBuffer(const std::string& message);
+
+    void addToOutputBuffer(const std::string &message);
     std::string getOutputBuffer();
     void clearOutputBuffer();
     bool hasDataToSend() const;
 
     bool isRegistered() const;
     void setRegistered(bool reg);
+
+    // Authentication state getters
+    bool isPassAuthenticated() const { return _passAuthenticated; }
+    bool isNickSet() const { return _nickSet; }
+    bool isUserSet() const { return _userSet; }
+    bool isFullyAuthenticated() const { return _passAuthenticated && _nickSet && _userSet; }
+
+    // Authentication setters
+    void setPassAuthenticated(bool value) { _passAuthenticated = value; }
+    void setNickSet(bool value) { _nickSet = value; }
+    void setUserSet(bool value) { _userSet = value; }
 };
 
 #endif // CLIENT_HPP
