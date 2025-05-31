@@ -12,6 +12,10 @@
 #include <poll.h>
 #include "Client.hpp"
 #include "Channel.hpp"
+#include <stdexcept>
+#include <cstring>
+#include <cerrno>
+#include <sstream>
 
 #define RESET "\033[0m"
 #define BOLD "\033[1m"
@@ -32,7 +36,7 @@
 #define BG_CYAN "\033[46m"
 
 // Forward declarations
-class Client;
+
 
 class Server
 {

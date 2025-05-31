@@ -1,5 +1,4 @@
 #include "includes/Channel.hpp"
-#include <algorithm>
 
 Channel::Channel(const std::string &name, Client *creator) : _name(name)
 {

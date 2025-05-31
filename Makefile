@@ -1,3 +1,15 @@
+# **************************************************************************** #
+#                                                                              #
+#                                                         :::      ::::::::    #
+#    Makefile                                           :+:      :+:    :+:    #
+#                                                     +:+ +:+         +:+      #
+#    By: asid-ahm <asid-ahm@student.42.fr>          +#+  +:+       +#+         #
+#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2025/05/31 08:26:18 by asid-ahm          #+#    #+#              #
+#    Updated: 2025/05/31 22:11:26 by asid-ahm         ###   ########.fr        #
+#                                                                              #
+# **************************************************************************** #
+
 # Colors and formatting
 RED    := \033[1;31m
 GREEN  := \033[1;32m
@@ -27,6 +39,8 @@ SRCS = $(SRC_DIR)/main.cpp \
        $(SRC_DIR)/Server.cpp \
        $(SRC_DIR)/Client.cpp \
 	   $(SRC_DIR)/Channel.cpp \
+	   $(SRC_DIR)/Commands.cpp \
+	   $(SRC_DIR)/Auth_Commands.cpp
 
 OBJS = $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
@@ -83,7 +97,7 @@ irssi1:
 	-v ${HOME}/.irssi-sender:/home/user/.irssi \
 	irssi
 
-irssi1:
+irssi2:
 	@echo "$(GREEN)Starting IRSSI client 1...$(RESET)"
 	@-docker run -it --name irssi-sender -e TERM -u $(shell id -u):$(shell id -g) \
 	--log-driver=none \
@@ -92,4 +106,4 @@ irssi1:
 
 re: fclean all
 
-.PHONY: all clean fclean re pre_build post_build
+.PHONY: all clean fclean re pre_build post_build irssi1 irssi2
