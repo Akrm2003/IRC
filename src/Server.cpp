@@ -434,20 +434,24 @@ void Server::processCommand(Client *client, const std::string &message)
     {
         if (params == "LS")
         {
-            std::string response = ":server CAP * LS :multi-prefix\r\n";
+            std::string response = ":server CAP * LS :\r\n";
             client->addToOutputBuffer(response);
             enableWriteEvent(client->getFd());
         }
-        else if (params == "REQ")
+        else if (params == "END")
         {
-            std::string response = ":server CAP * ACK :multi-prefix\r\n";
+            // CAP negotiation ended - do nothing
+        }
+        else if (params.find("REQ") == 0)
+        {
+            std::string response = ":server CAP * ACK :\r\n";
             client->addToOutputBuffer(response);
             enableWriteEvent(client->getFd());
         }
         else
         {
-            std::string response = ":server 501 " + (client->getNickname().empty() ? "*" : client->getNickname());
-            response += " :Unknown CAP command\r\n";
+            std::string response = ":server 410 " + (client->getNickname().empty() ? "*" : client->getNickname());
+            response += " :Invalid CAP command\r\n";
             client->addToOutputBuffer(response);
             enableWriteEvent(client->getFd());
         }
@@ -458,14 +462,23 @@ void Server::processCommand(Client *client, const std::string &message)
         {
             if (params.empty())
             {
-                std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
-                response += " " + params + " :No such channel\r\n";
+                std::string response = ":server 461 " + (client->getNickname().empty() ? "*" : client->getNickname());
+                response += " JOIN :Not enough parameters\r\n";
                 client->addToOutputBuffer(response);
                 enableWriteEvent(client->getFd());
                 return;
             }
-            else
-                handleJoin(client, params);
+            
+            // Extract just the channel name
+            std::string channelName = params;
+            size_t spacePos = channelName.find(' ');
+            if (spacePos != std::string::npos)
+            {
+                channelName = channelName.substr(0, spacePos);
+            }
+            
+            std::cout << CYAN << "DEBUG: About to call handleJoin with channel: '" << channelName << "'" << RESET << std::endl;
+            handleJoin(client, channelName);
         }
         else if (command == "PART")
         {
@@ -486,21 +499,43 @@ void Server::processCommand(Client *client, const std::string &message)
             }
             handlePart(client, channelName, partMessage);
         }
-
         else if (command == "PRIVMSG")
         {
+            std::cout << CYAN << "DEBUG PRIVMSG: params='" << params << "'" << RESET << std::endl;
+            
             size_t spacePos = params.find(' ');
-            std::string channelName = params.substr(0, spacePos);
-            std::string messageContent = params.substr(spacePos + 1);
-            // Check if the message content is empty
-            if (messageContent.empty())
+            if (spacePos == std::string::npos)
             {
                 std::string response = ":server 411 " + (client->getNickname().empty() ? "*" : client->getNickname());
-                response += " " + channelName + " :No recipient given\r\n";
+                response += " :No recipient given\r\n";
                 client->addToOutputBuffer(response);
                 enableWriteEvent(client->getFd());
                 return;
             }
+            
+            std::string channelName = params.substr(0, spacePos);
+            std::string messageContent = params.substr(spacePos + 1);
+            
+            std::cout << CYAN << "DEBUG: channelName='" << channelName << "' messageContent='" << messageContent << "'" << RESET << std::endl;
+            
+            // Remove the leading ':' from message content if present
+            if (!messageContent.empty() && messageContent[0] == ':')
+            {
+                messageContent = messageContent.substr(1);
+            }
+            
+            std::cout << CYAN << "DEBUG: After colon removal: messageContent='" << messageContent << "'" << RESET << std::endl;
+            
+            // Check if the message content is empty after removing ':'
+            if (messageContent.empty())
+            {
+                std::string response = ":server 412 " + (client->getNickname().empty() ? "*" : client->getNickname());
+                response += " :No text to send\r\n";
+                client->addToOutputBuffer(response);
+                enableWriteEvent(client->getFd());
+                return;
+            }
+            
             // Handle the PRIVMSG command
             handlePrivmsg(client, channelName, messageContent);
         }
@@ -512,6 +547,31 @@ void Server::processCommand(Client *client, const std::string &message)
             handleMode(client, params);
         else if (command == "INVITE")
             handleInvite(client, params);
+        else
+        {
+            std::string response = " :server 421 " + (client->getNickname().empty() ? "*" : client->getNickname());
+            response += " " + command + " : Unknown command \r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+        }
+    }
+    else if (command == "JOIN")
+    {
+        // Handle JOIN for non-registered clients
+        if (!client->isAuthenticated())
+        {
+            std::string response = ":server 451 " + (client->getNickname().empty() ? "*" : client->getNickname());
+            response += " :You have not registered\r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+        }
+        else if (!client->isRegistered())
+        {
+            std::string response = ":server 451 " + (client->getNickname().empty() ? "*" : client->getNickname());
+            response += " :You have not registered\r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+        }
     }
     else
     {
