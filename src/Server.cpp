@@ -378,7 +378,7 @@ Client *Server::getClientByFd(int fd)
     return NULL; // Client not found
 }
 
-// NOTE: Now accepts the actual message content from the user, instead of a hardcoded string
+
 
 
 void Server::processCommand(Client *client, const std::string &message)
@@ -479,6 +479,13 @@ void Server::processCommand(Client *client, const std::string &message)
             
             std::cout << CYAN << "DEBUG: About to call handleJoin with channel: '" << channelName << "'" << RESET << std::endl;
             handleJoin(client, channelName);
+        }
+        else if (command == "NOTICE")
+        {
+            std::string messege = "Notice: " + params + "\r\n"; 
+            client->addToOutputBuffer(messege);
+            enableWriteEvent(client->getFd());
+            return ;
         }
         else if (command == "PART")
         {

@@ -98,8 +98,14 @@ public:
     void handleKick(Client *client, const std::string &channelNameRaw);
     void handlePrivmsg(Client *client, const std::string &channelNameRaw, const std::string &message);
     void handleInvite(Client *client, const std::string &params);
+    void handleNotice(Client *client, const std::string &params, const std::string &messageContent);
+    void handleChannelPrivmsg(Client *client, const std::string &channelName, const std::string &messageContent);
+    void handleUserPrivmsg(Client *client, const std::string &targetNickname, const std::string &messageContent);
+    
+
+
 };
 
 int countArguments(const std::string &params);
 
-#endif // SERVER_HPP
+#endif

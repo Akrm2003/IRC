@@ -68,13 +68,10 @@ void Server::handlePart(Client *client, const std::string &channelNameRaw, const
     client->addToOutputBuffer(response);
     enableWriteEvent(client->getFd());
 }
-
-void Server::handlePrivmsg(Client *client, const std::string &channelNameRaw, const std::string &messageContent)
+void Server::handleChannelPrivmsg(Client *client, const std::string &channelName, const std::string &messageContent)
 {
-    std::string channelName = channelNameRaw;
-
-    // Validate channel name as before
-    if ((channelName[0] != '#' && channelName[0] != '&') || !channelName[1])
+    // Validate channel name
+    if (channelName.length() < 2)
     {
         std::string response = ":server 403 " + (client->getNickname().empty() ? "*" : client->getNickname());
         response += " " + channelName + " :No such channel\r\n";
@@ -88,7 +85,7 @@ void Server::handlePrivmsg(Client *client, const std::string &channelNameRaw, co
     {
         if (it->getName() == channelName)
         {
-
+            // Check if client is in the channel
             if (!it->hasClient(client))
             {
                 std::string response = ":server 404 " + client->getNickname() + " " + channelName + " :Cannot send to channel\r\n";
@@ -96,18 +93,20 @@ void Server::handlePrivmsg(Client *client, const std::string &channelNameRaw, co
                 enableWriteEvent(client->getFd());
                 return;
             }
-            // *** MODIFICATION: Use the actual message from the user ***
+
+            // Create the message
             std::string message = ":" + client->getNickname() + " PRIVMSG " + channelName + " :" + messageContent + "\r\n";
 
-            // Send message to all clients in the channel
+            // Send message to all clients in the channel EXCEPT the sender
             const std::vector<Client *> &clients = it->getClients();
             for (size_t i = 0; i < clients.size(); ++i)
             {
-                clients[i]->addToOutputBuffer(message);
-                enableWriteEvent(clients[i]->getFd());
+                if (clients[i] != client) // Don't send back to sender
+                {
+                    clients[i]->addToOutputBuffer(message);
+                    enableWriteEvent(clients[i]->getFd());
+                }
             }
-
-            enableWriteEvent(client->getFd());
             return;
         }
     }
@@ -117,6 +116,43 @@ void Server::handlePrivmsg(Client *client, const std::string &channelNameRaw, co
     response += " " + channelName + " :No such channel\r\n";
     client->addToOutputBuffer(response);
     enableWriteEvent(client->getFd());
+}
+
+void Server::handleUserPrivmsg(Client *client, const std::string &targetNickname, const std::string &messageContent)
+{
+    // Find the target client by nickname
+    Client *targetClient = getClientByNickname(targetNickname);
+    
+    if (!targetClient)
+    {
+        // User not found, send error 401
+        std::string response = ":server 401 " + (client->getNickname().empty() ? "*" : client->getNickname());
+        response += " " + targetNickname + " :No such nick/channel\r\n";
+        client->addToOutputBuffer(response);
+        enableWriteEvent(client->getFd());
+        return;
+    }
+
+    // Create the private message
+    std::string message = ":" + client->getNickname() + " PRIVMSG " + targetNickname + " :" + messageContent + "\r\n";
+    
+    // Send message to the target client
+    targetClient->addToOutputBuffer(message);
+    enableWriteEvent(targetClient->getFd());
+}
+void Server::handlePrivmsg(Client *client, const std::string &targetName, const std::string &messageContent)
+{
+    // Check if target is a channel (starts with # or &)
+    if (!targetName.empty() && (targetName[0] == '#' || targetName[0] == '&'))
+    {
+        // Handle channel message
+        handleChannelPrivmsg(client, targetName, messageContent);
+    }
+    else
+    {
+        // Handle private message to user
+        handleUserPrivmsg(client, targetName, messageContent);
+    }
 }
 
 void Server::handleKick(Client *client, const std::string &params)
@@ -159,49 +195,98 @@ void Server::handleKick(Client *client, const std::string &params)
         std::string response = ":server 403 " + client->getNickname() + " " + channelName + " :No such channel\r\n";
         client->addToOutputBuffer(response);
         enableWriteEvent(client->getFd());
-        return;
+            return;
+        }
+
+        // Check if the sender is a channel operator
+        if (!targetChannel->isOperator(client))
+        {
+            std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not a channel operator\r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+            return;
+        }
+
+        // Find the target client by nickname
+        Client *targetClient = getClientByNickname(targetNick); // You need this helper
+        if (!targetClient)
+        {
+            std::string response = ":server 401 " + client->getNickname() + " " + targetNick + " :No such nick\r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+            return;
+        }
+
+        // Check if the target is in the channel
+        if (!targetChannel->hasClient(targetClient))
+        {
+            std::string response = ":server 441 " + client->getNickname() + " " + targetNick + " " + channelName + " :They aren't on that channel\r\n";
+            client->addToOutputBuffer(response);
+            enableWriteEvent(client->getFd());
+            return;
+        }
+
+        // Notify all users in the channel
+        std::string kickMsg = ":" + client->getNickname() + " KICK " + channelName + " " + targetNick + "\r\n";
+        const std::vector<Client *> &clients = targetChannel->getClients();
+        for (size_t i = 0; i < clients.size(); ++i)
+        {
+            clients[i]->addToOutputBuffer(kickMsg);
+            enableWriteEvent(clients[i]->getFd());
+        }
+
+        // Remove target client from the channel
+        targetChannel->removeClient(targetClient);
     }
 
-    // Check if the sender is a channel operator
-    if (!targetChannel->isOperator(client))
+    void Server::handleNotice(Client *client, const std::string &params, const std::string &messageContent)
     {
-        std::string response = ":server 482 " + client->getNickname() + " " + channelName + " :You're not a channel operator\r\n";
-        client->addToOutputBuffer(response);
-        enableWriteEvent(client->getFd());
-        return;
+        std::string target;
+        size_t spacePos = params.find(' ');
+        if (spacePos != std::string::npos)
+            target = params.substr(0, spacePos);
+        else
+            target = params;
+    
+        if (target.empty())
+            return; // No target, ignore silently
+    
+        // Check if it's a channel
+        if (target[0] == '#' || target[0] == '&')
+        {
+            for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+            {
+                if (it->getName() == target)
+                {
+                    std::string noticeMsg = ":" + client->getNickname() + " NOTICE " + target + " :" + messageContent + "\r\n";
+                    const std::vector<Client *> &clients = it->getClients();
+                    for (size_t i = 0; i < clients.size(); ++i)
+                    {
+                        if (clients[i] != client) // Don't send back to the sender
+                        {
+                            clients[i]->addToOutputBuffer(noticeMsg);
+                            enableWriteEvent(clients[i]->getFd());
+                        }
+                    }
+                    return; // Done
+                }
+            }
+        }
+        else
+        {
+            // It's a user target
+            Client *targetClient = getClientByNickname(target);
+            if (targetClient && targetClient != client)
+            {
+                std::string noticeMsg = ":" + client->getNickname() + " NOTICE " + target + " :" + messageContent + "\r\n";
+                targetClient->addToOutputBuffer(noticeMsg);
+                enableWriteEvent(targetClient->getFd());
+            }
+        }
+        // No error messages sent for NOTICE, per RFC.
     }
+    
 
-    // Find the target client by nickname
-    Client *targetClient = getClientByNickname(targetNick); // You need this helper
-    if (!targetClient)
-    {
-        std::string response = ":server 401 " + client->getNickname() + " " + targetNick + " :No such nick\r\n";
-        client->addToOutputBuffer(response);
-        enableWriteEvent(client->getFd());
-        return;
-    }
-
-    // Check if the target is in the channel
-    if (!targetChannel->hasClient(targetClient))
-    {
-        std::string response = ":server 441 " + client->getNickname() + " " + targetNick + " " + channelName + " :They aren't on that channel\r\n";
-        client->addToOutputBuffer(response);
-        enableWriteEvent(client->getFd());
-        return;
-    }
-
-    // Notify all users in the channel
-    std::string kickMsg = ":" + client->getNickname() + " KICK " + channelName + " " + targetNick + "\r\n";
-    const std::vector<Client *> &clients = targetChannel->getClients();
-    for (size_t i = 0; i < clients.size(); ++i)
-    {
-        clients[i]->addToOutputBuffer(kickMsg);
-        enableWriteEvent(clients[i]->getFd());
-    }
-
-    // Remove target client from the channel
-    targetChannel->removeClient(targetClient);
-}
 
 void Server::handleMode(Client *client, const std::string &params)
 {

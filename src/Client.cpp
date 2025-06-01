@@ -56,7 +56,7 @@ bool Client::hasCompleteMessage() const {
     if (_inputBuffer.find("\r\n") != std::string::npos)
         return true;
         
-    // Also accept just \n for easier testing with regular netcat
+
     if (_inputBuffer.find("\n") != std::string::npos)
         return true;
         
