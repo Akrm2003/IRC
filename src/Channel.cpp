@@ -126,3 +126,36 @@ bool Channel::removeClient(Client *client)
 
     return true;
 }
+
+void Channel::addInvitedClient(Client *client)
+{
+    // Check if already invited
+    for (std::vector<Client*>::iterator it = _invitedClients.begin(); it != _invitedClients.end(); ++it)
+    {
+        if (*it == client)
+            return; // Already in the list
+    }
+    _invitedClients.push_back(client);
+}
+
+bool Channel::isInvited(Client *client) const
+{
+    for (std::vector<Client*>::const_iterator it = _invitedClients.begin(); it != _invitedClients.end(); ++it)
+    {
+        if (*it == client)
+            return true;
+    }
+    return false;
+}
+
+void Channel::removeInvitation(Client *client)
+{
+    for (std::vector<Client*>::iterator it = _invitedClients.begin(); it != _invitedClients.end(); ++it)
+    {
+        if (*it == client)
+        {
+            _invitedClients.erase(it);
+            return;
+        }
+    }
+}

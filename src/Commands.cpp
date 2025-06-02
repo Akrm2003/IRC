@@ -708,6 +708,8 @@ void Server::handleInvite(Client *client, const std::string &params)
         enableWriteEvent(client->getFd());
         return;
     }
+    targetChannel->addInvitedClient(targetClient);
+
 
     // Send invite message
     std::string inviteMsg = ":" + client->getNickname() + " INVITE " + targetNick + " :" + channelName + "\r\n";

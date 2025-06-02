@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 class Client;
 
@@ -15,10 +16,12 @@ private:
     // bool _passwordProtected;        // Password-protected flag
     std::string _password;            // Channel password
     std::vector<Client *> _clients;   // Clients in the channel
-    std::vector<Client *> _operators; // Channel operators
+    std::vector<Client *> _operators;
+    std::vector<Client*> _invitedClients;
     bool _topicRestricted;            // Topic restricted flag
     bool _inviteOnly;                 // Invite-only flag
-    int _userLimit;                   // Maximum number of users allowed in the channel
+    int _userLimit;
+                      // Maximum number of users allowed in the channel
 
 public:
     Channel(const std::string &name, Client *creator);
@@ -47,6 +50,9 @@ public:
     bool isInviteOnly() const;
     bool isTopicRestricted() const;
     bool isPasswordProtected() const;
+    void addInvitedClient(Client *client);
+    bool isInvited(Client *client) const;
+    void removeInvitation(Client *client);
 };
 
 #endif

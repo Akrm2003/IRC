@@ -21,13 +21,18 @@ void Server::handleJoin(Client *client, const std::string &channelNameRaw)
         {
             // Channel already exists, try to add the client
             // check if the client is invited and if the channel is invite-only
-            if (it->isInviteOnly() && !it->isOperator(client) && !it->hasClient(client))
+            if (it->isInviteOnly() && !it->isOperator(client) && !it->hasClient(client) && !it->isInvited(client))
             {
                 std::string response = ":server 473 " + (client->getNickname().empty() ? "*" : client->getNickname());
                 response += " " + channelName + " :Cannot join channel (+i)\r\n";
                 client->addToOutputBuffer(response);
                 enableWriteEvent(client->getFd());
                 return;
+            }
+            
+            if(it->isInvited(client))
+            {
+                it->removeInvitation(client);
             }
             if (it->addClient(client))
             {
