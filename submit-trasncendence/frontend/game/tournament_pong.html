@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Pong - ft_transcendence</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏆</text></svg>">
+    <link rel="stylesheet" href="game_pvp/style.css">
+    <style>
+        /* Tournament-specific styling */
+        .tournament-header {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            border: 2px solid #ffd700;
+            border-radius: 15px;
+            padding: 10px 20px;
+            color: #ffd700;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }
+        
+        .tournament-info {
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+        
+        .match-title {
+            font-size: 16px;
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        /* Override main styles to match PvP game layout */
+        main {
+            margin-top: 80px; /* Make room for tournament header */
+        }
+    </style>
+</head>
+<body>
+    <div class="tournament-header">
+        <div class="tournament-info">🏆 TOURNAMENT MATCH</div>
+        <div class="match-title" id="matchTitle">Loading...</div>
+    </div>
+    
+    <button class="back-button" onclick="returnToTournament()">
+        ← Back to Tournament
+    </button>
+    
+    <main>
+        <h1>Tournament Pong - Transcendence</h1>
+        <section id="game-container">
+            <canvas id="pong-canvas" width="800" height="400"></canvas>
+        </section>
+        <section id="game-info">
+            <div id="score-display">Player 1: 0 | Player 2: 0</div>
+            <div id="game-status">Press SPACE to pause | ESC to return to tournament</div>
+            <div id="controls-info">
+                Player 1: <span class="key">W</span> / <span class="key">S</span> | 
+                Player 2: <span class="key">↑</span> / <span class="key">↓</span> | 
+                Pause: <span class="key">SPACE</span> | 
+                Return: <span class="key">ESC</span>
+            </div>
+        </section>
+    </main>
+    
+    <script src="tournament_pong.js"></script>
+</body>
+</html>

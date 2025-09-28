@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong Game - Transcendence</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏓</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .auth-message {
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Authentication check overlay -->
+    <div id="authCheck" class="auth-overlay">
+        <div class="auth-message">
+            <div class="spinner"></div>
+            <p>Checking authentication...</p>
+        </div>
+    </div>
+    <main>
+        <h1>Pong - Transcendence</h1>
+        <section id="game-container">
+            <canvas id="pong-canvas" width="800" height="400"></canvas>
+        </section>
+        <section id="game-info">
+            <div id="score-display">Player 1: 0 | Player 2: 0</div>
+            <div id="game-status">Press SPACE to pause | ESC for menu</div>
+            <div id="controls-info">
+                Player 1: <span class="key">W</span> / <span class="key">S</span> | 
+                Player 2: <span class="key">↑</span> / <span class="key">↓</span> | 
+                Pause: <span class="key">SPACE</span> | 
+                Reset: <span class="key">ESC</span> | 
+                Tracer-Mode: <span class="key">D</span>
+            </div>
+        </section>
+    </main>
+    
+    <!-- Authentication script -->
+    <script>
+        async function checkAuthentication() {
+            const authOverlay = document.getElementById('authCheck');
+            
+            try {
+                console.log('🔐 Checking authentication for Pong game...');
+                
+                // Check if user is authenticated
+                const response = await fetch('/api/users/profile', {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    console.log('✅ User authenticated - starting game');
+                    authOverlay.classList.add('hidden');
+                } else {
+                    console.log('❌ User not authenticated - redirecting to login');
+                    throw new Error('Not authenticated');
+                }
+            } catch (error) {
+                console.error('🚨 Authentication failed:', error);
+                
+                // Show error and redirect
+                authOverlay.innerHTML = `
+                    <div class="auth-message">
+                        <h2 style="color: #ff6b6b; margin-bottom: 20px;">🔒 Authentication Required</h2>
+                        <p style="margin-bottom: 20px;">You need to be logged in to play Pong games.</p>
+                        <button onclick="window.location.href='/auth/login.html'" 
+                                style="background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                            Go to Login
+                        </button>
+                        <br><br>
+                        <button onclick="window.location.href='/home/home.html'" 
+                                style="background: #95a5a6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                            Back to Home
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Run auth check when page loads
+        document.addEventListener('DOMContentLoaded', checkAuthentication);
+    </script>
+    
+    <script src="game_final.js"></script>
+</body>
+</html>

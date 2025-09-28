@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ft_transcendence</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="loading" class="flex items-center justify-center min-h-screen">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto"></div>
+            <p class="mt-4 text-white">Loading...</p>
+        </div>
+    </div>
+    
+    <!-- Import TypeScript files with .ts extensions -->
+    <script type="module" src="/src/router/authRouter.ts"></script>
+    <script type="module">
+        import { verifyAuthentication, check2FAStatus } from '/src/router/authRouter.ts';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Prevent multiple executions
+            if (window.authCheckInProgress) {
+                console.log('🛑 Auth check already in progress');
+                return;
+            }
+            window.authCheckInProgress = true;
+            
+            console.log('🏁 Starting authentication flow...');
+            console.log('📍 Current URL:', window.location.href);
+            console.log('🍪 Current cookies:', document.cookie);
+            
+            try {
+                // First check if 2FA is needed
+                const needs2FA = await check2FAStatus();
+                
+                if (needs2FA) {
+                    console.log('🔐 2FA verification needed, redirecting...');
+                    window.location.replace('/auth/2fa.html');
+                    return;
+                }
+                
+                // Then check main authentication
+                const isAuthenticated = await verifyAuthentication();
+                console.log('🔍 Authentication result:', isAuthenticated);
+                
+                if (isAuthenticated) {
+                    console.log('✅ User authenticated, redirecting to home...');
+                    window.location.replace('/home/home.html');
+                } else {
+                    console.log('❌ User not authenticated, redirecting to login...');
+                    window.location.replace('/auth/login.html');
+                }
+            } catch (error) {
+                console.error('🚨 Authentication check failed:', error);
+                window.location.replace('/auth/login.html');
+            } finally {
+                window.authCheckInProgress = false;
+            }
+        });
+    </script>
+</body>
+</html>

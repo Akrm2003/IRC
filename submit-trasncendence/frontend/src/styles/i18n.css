@@ -1,0 +1,200 @@
+/**
+ * Internationalization CSS for ft_transcendence
+ * Handles RTL support and language-specific styling
+ */
+
+/* RTL Support */
+html[dir="rtl"] {
+  direction: rtl;
+}
+
+html[dir="rtl"] body {
+  text-align: right;
+}
+
+/* RTL Navigation adjustments */
+html[dir="rtl"] nav .flex {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .nav-link::after {
+  right: 0;
+  left: auto;
+}
+
+/* RTL Button adjustments */
+html[dir="rtl"] .flex.items-center {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .flex.items-center svg {
+  margin-left: 0;
+  margin-right: 0.5rem;
+}
+
+/* RTL Game mode buttons */
+html[dir="rtl"] .game-mode-btn {
+  text-align: center; /* Keep centered for game buttons */
+}
+
+/* RTL Profile cards */
+html[dir="rtl"] .profile-card .flex {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .stat-card {
+  text-align: center; /* Keep stats centered */
+}
+
+/* RTL Chat and Friends */
+html[dir="rtl"] .friend-card .flex {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .message-bubble {
+  text-align: right;
+}
+
+html[dir="rtl"] .message-bubble.sent {
+  margin-left: 0;
+  margin-right: 2rem;
+}
+
+html[dir="rtl"] .message-bubble.received {
+  margin-right: 0;
+  margin-left: 2rem;
+}
+
+/* RTL Tournament brackets */
+html[dir="rtl"] .bracket-container {
+  direction: ltr; /* Keep tournament brackets LTR for better readability */
+}
+
+/* RTL Forms */
+html[dir="rtl"] .form-input {
+  text-align: right;
+}
+
+html[dir="rtl"] label {
+  text-align: right;
+}
+
+/* Language-specific font adjustments */
+html[lang="ar"] {
+  font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
+}
+
+html[lang="ar"] .hero-gradient,
+html[lang="ar"] h1,
+html[lang="ar"] h2,
+html[lang="ar"] h3 {
+  font-weight: 700; /* Slightly lighter for Arabic */
+}
+
+/* Arabic number formatting */
+html[lang="ar"] .stat-card .text-3xl,
+html[lang="ar"] .score,
+html[lang="ar"] .number {
+  font-family: 'Segoe UI', monospace; /* Use monospace for numbers in Arabic */
+  direction: ltr; /* Keep numbers LTR */
+  display: inline-block;
+}
+
+/* RTL Animations - reverse some animations for better RTL experience */
+html[dir="rtl"] .game-mode-btn::before {
+  left: auto;
+  right: -100%;
+}
+
+html[dir="rtl"] .game-mode-btn:hover::before {
+  right: 100%;
+  left: auto;
+}
+
+html[dir="rtl"] .stat-card::before {
+  left: auto;
+  right: -100%;
+}
+
+html[dir="rtl"] .stat-card:hover::before {
+  right: 100%;
+  left: auto;
+}
+
+/* RTL Dropdown menus */
+html[dir="rtl"] .dropdown-menu {
+  right: auto;
+  left: 0;
+}
+
+html[dir="rtl"] #languageDropdown {
+  right: auto;
+  left: 0;
+}
+
+/* RTL Mobile menu */
+html[dir="rtl"] #mobileMenu {
+  text-align: right;
+}
+
+html[dir="rtl"] #mobileMenu .flex.items-center {
+  flex-direction: row-reverse;
+}
+
+/* Responsive RTL adjustments */
+@media (max-width: 768px) {
+  html[dir="rtl"] .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  html[dir="rtl"] .text-center {
+    text-align: center; /* Keep centered content centered on mobile */
+  }
+}
+
+/* Smooth transitions for direction changes */
+* {
+  transition: margin 0.3s ease, padding 0.3s ease;
+}
+
+/* Language switcher specific styles */
+.language-option {
+  transition: all 0.2s ease;
+}
+
+.language-option:hover {
+  background-color: rgba(71, 85, 105, 0.5);
+}
+
+/* Notification styles for language switching */
+.language-notification {
+  backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+}
+
+/* Fix for Arabic text in buttons */
+html[lang="ar"] button,
+html[lang="ar"] .btn {
+  font-weight: 500;
+}
+
+/* Ensure proper text direction for mixed content */
+.mixed-content {
+  unicode-bidi: plaintext;
+}
+
+/* Special handling for brand name - keep LTR */
+.brand-name,
+[data-i18n="navigation.brand"] {
+  direction: ltr !important;
+  display: inline-block;
+}
+
+/* Keep game scores and numbers LTR in Arabic */
+html[lang="ar"] .score,
+html[lang="ar"] .match-score,
+html[lang="ar"] .stat-number {
+  direction: ltr;
+  display: inline-block;
+}

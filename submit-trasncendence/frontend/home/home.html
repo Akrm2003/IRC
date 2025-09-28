@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ping Pong Game - Home</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../src/styles/i18n.css">
+  <style>
+    .game-mode-btn {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%);
+      border: 2px solid transparent;
+      border-radius: 16px;
+      padding: 2rem;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      box-shadow: 
+        0 10px 25px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+    
+    .game-mode-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transition: left 0.6s;
+    }
+    
+    .game-mode-btn:hover::before {
+      left: 100%;
+    }
+    
+    .game-mode-btn:hover {
+      transform: translateY(-8px) scale(1.02);
+      border-color: rgba(204, 102, 255, 0.6);
+      box-shadow: 
+        0 20px 40px rgba(204, 102, 255, 0.2),
+        0 0 0 1px rgba(204, 102, 255, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .game-mode-btn:active {
+      transform: translateY(-4px) scale(0.98);
+    }
+    
+    .hero-gradient {
+      background: linear-gradient(135deg, #cc66ff 0%, #ff66cc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .floating-animation {
+      animation: float 6s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    .nav-link {
+      position: relative;
+      padding-bottom: 0.5rem;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #cc66ff, #ff66cc);
+      transition: width 0.3s ease;
+    }
+    
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    
+    .nav-link.active {
+      color: #cc66ff;
+    }
+    
+    .nav-link.active::after {
+      width: 100%;
+    }
+    
+    body {
+      background: radial-gradient(ellipse at top, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.4) 100%);
+    }
+
+    /* Enhanced Responsive adjustments */
+    @media (max-width: 768px) {
+      .game-mode-btn {
+        padding: 1.5rem 1rem;
+        border-radius: 12px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .game-mode-btn {
+        padding: 1.25rem 0.75rem;
+        border-radius: 10px;
+      }
+      
+      .hero-gradient {
+        font-size: 2.5rem !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .game-mode-btn {
+        padding: 1rem 0.5rem;
+        border-radius: 8px;
+      }
+      
+      .hero-gradient {
+        font-size: 2rem !important;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .game-mode-btn {
+        padding: 0.875rem 0.5rem;
+      }
+      
+      .hero-gradient {
+        font-size: 1.75rem !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-white relative overflow-x-hidden">
+  
+  <!-- Add loading overlay for auth check -->
+  <div id="authLoader" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+      <p class="text-white">🔐 Verifying authentication...</p>
+    </div>
+  </div>
+
+  <!-- Clear Background Image - No blur/opacity -->
+  <div class="absolute inset-0 bg-cover bg-center bg-no-repeat" 
+       style="background-image: url('../assets/homepage-bc.jpg');"></div>
+  
+  <!-- Subtle particle effects -->
+  <div class="absolute inset-0 overflow-hidden">
+    <div class="absolute w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -top-48 -left-48 animate-pulse"></div>
+    <div class="absolute w-96 h-96 bg-purple-500/5 rounded-full blur-3xl -bottom-48 -right-48 animate-pulse" style="animation-delay: 2s;"></div>
+  </div>
+  
+  <!-- Content overlay -->
+  <div class="relative z-10">
+    <!-- Navigation -->
+    <nav class="bg-slate-800/70 backdrop-blur-md px-4 sm:px-8 py-4 border-b border-slate-700/50 shadow-xl">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex justify-between items-center">
+          <!-- Logo/Brand -->
+          <div class="flex items-center">
+            <span class="text-xl font-bold text-white gradient-text brand-name">Ping Pong Arena</span>
+          </div>
+          
+          <!-- Desktop Navigation -->
+          <div class="hidden md:flex items-center gap-6">
+            <a href="/home/home.html" class="nav-link active text-purple-400 font-medium" data-i18n="common.home">Home</a>
+            <a href="/dashboard/dashboard.html" class="nav-link text-slate-300 hover:text-white transition-colors" data-i18n="common.dashboard">Dashboard</a>
+            <a href="/friends/friends.html" class="nav-link text-slate-300 hover:text-white transition-colors" data-i18n="common.friends">Friends</a>
+            <a href="/profile/profile.html" class="nav-link text-slate-300 hover:text-white transition-colors" data-i18n="common.profile">Profile</a>
+            <a href="/tournaments/tournaments.html" class="nav-link text-slate-300 hover:text-white transition-colors" data-i18n="common.tournaments">Tournaments</a>
+            
+            <!-- Language Switcher -->
+            <div id="languageSwitcher"></div>
+            
+            <button id="logoutBtn" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-4 py-2 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105" data-i18n="common.logout">
+              Logout
+            </button>
+          </div>
+          
+          <!-- Mobile menu button - Enhanced touch target -->
+          <button id="mobileMenuBtn" class="md:hidden text-white p-3 hover:bg-slate-700/50 rounded-lg transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Mobile Navigation - Enhanced touch targets -->
+        <div id="mobileMenu" class="hidden md:hidden mt-4 pb-4 border-t border-slate-700/50">
+          <div class="flex flex-col space-y-2 pt-4">
+            <a href="/home/home.html" class="nav-link active text-purple-400 font-medium text-center py-3 px-4 rounded-lg bg-purple-500/10">Home</a>
+            <a href="/dashboard/dashboard.html" class="nav-link text-slate-300 hover:text-white hover:bg-slate-700/30 transition-all text-center py-3 px-4 rounded-lg">Dashboard</a>
+            <a href="/friends/friends.html" class="nav-link text-slate-300 hover:text-white hover:bg-slate-700/30 transition-all text-center py-3 px-4 rounded-lg">Friends</a>
+            <a href="/profile/profile.html" class="nav-link text-slate-300 hover:text-white hover:bg-slate-700/30 transition-all text-center py-3 px-4 rounded-lg">Profile</a>
+            <a href="/tournaments/tournaments.html" class="nav-link text-slate-300 hover:text-white hover:bg-slate-700/30 transition-all text-center py-3 px-4 rounded-lg">Tournaments</a>
+            <button id="logoutBtnMobile" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-4 py-3 rounded-lg transition-all duration-300 mx-2 mt-3 font-medium">
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 px-4 sm:px-8 py-8 sm:py-16 min-h-screen flex items-center justify-center">
+      <div class="max-w-6xl mx-auto w-full">
+        
+        <!-- Hero Section - Responsive -->
+        <div class="text-center mb-12 sm:mb-20 floating-animation">
+          <!-- Responsive hero title -->
+          <h1 class="text-4xl sm:text-6xl lg:text-7xl font-black mb-4 sm:mb-6 hero-gradient tracking-tight" data-i18n="home.title">
+            PING PONG ARENA
+          </h1>
+          <!-- Responsive subtitle -->
+          <p class="text-lg sm:text-xl lg:text-2xl text-slate-300 font-light max-w-2xl mx-auto leading-relaxed px-4" data-i18n="home.subtitle">
+            Choose your battlefield and dominate the table in epic battles
+          </p>
+        </div>
+
+        <!-- Game Modes - Responsive Grid Layout -->
+        <div class="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 max-w-sm sm:max-w-md lg:max-w-4xl mx-auto">
+          
+          <!-- AI Mode -->
+          <button id="aiBtn" class="game-mode-btn w-full">
+            <div class="text-center">
+              <h3 class="text-xl sm:text-2xl font-bold mb-2 text-white" data-i18n="home.aiChallenge">AI CHALLENGE</h3>
+              <p class="text-slate-300 text-xs sm:text-sm" data-i18n="home.aiDescription">Test your skills against our advanced AI</p>
+            </div>
+          </button>
+
+          <!-- PvP Mode -->
+          <button id="pvpBtn" class="game-mode-btn w-full">
+            <div class="text-center">
+              <h3 class="text-xl sm:text-2xl font-bold mb-2 text-white" data-i18n="home.pvpBattle">1 vs 1 BATTLE</h3>
+              <p class="text-slate-300 text-xs sm:text-sm" data-i18n="home.pvpDescription">Challenge your friends in epic duels</p>
+            </div>
+          </button>
+
+          <!-- Tournament -->
+          <button id="tournamentBtn" class="game-mode-btn w-full">
+            <div class="text-center">
+              <h3 class="text-xl sm:text-2xl font-bold mb-2 text-white" data-i18n="home.tournament">TOURNAMENT</h3>
+              <p class="text-slate-300 text-xs sm:text-sm" data-i18n="home.tournamentDescription">Compete in bracket-style championships</p>
+            </div>
+          </button>
+
+          <!-- Extra Games -->
+          <button id="extraBtn" class="game-mode-btn w-full">
+            <div class="text-center">
+              <h3 class="text-xl sm:text-2xl font-bold mb-2 text-white" data-i18n="home.extraGames">EXTRA GAMES</h3>
+              <p class="text-slate-300 text-xs sm:text-sm" data-i18n="home.extraDescription">Discover more exciting game modes</p>
+            </div>
+          </button>
+
+        </div>
+
+
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile menu toggle functionality -->
+  <script>
+  // Mobile menu toggle
+  document.addEventListener('DOMContentLoaded', () => {
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    
+    if (mobileMenuBtn && mobileMenu) {
+      mobileMenuBtn.addEventListener('click', () => {
+        mobileMenu.classList.toggle('hidden');
+        
+        // Update hamburger icon
+        const svg = mobileMenuBtn.querySelector('svg path');
+        if (mobileMenu.classList.contains('hidden')) {
+          svg.setAttribute('d', 'M4 6h16M4 12h16M4 18h16'); // Hamburger
+        } else {
+          svg.setAttribute('d', 'M6 18L18 6M6 6l12 12'); // X
+        }
+      });
+    }
+    
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (mobileMenu && !mobileMenu.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+        mobileMenu.classList.add('hidden');
+        const svg = mobileMenuBtn.querySelector('svg path');
+        svg.setAttribute('d', 'M4 6h16M4 12h16M4 18h16'); // Reset to hamburger
+      }
+    });
+  });
+  </script>
+
+  <!-- Debug script to check button functionality -->
+  <script>
+  // Debug script to check button functionality
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('Home page DOM loaded - inline debug script');
+    
+    // Find all navigation buttons
+    const homeBtn = document.getElementById('homeBtn');
+    const friendsBtn = document.getElementById('friendsBtn');
+    const profileBtn = document.getElementById('profileBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    console.log('Button status:', {
+      home: homeBtn !== null,
+      friends: friendsBtn !== null,
+      profile: profileBtn !== null,
+      logout: logoutBtn !== null
+    });
+    
+    // Add fallback event listeners for debugging
+    if (profileBtn) {
+      profileBtn.addEventListener('click', function() {
+        console.log('Profile button clicked (fallback listener)');
+        console.log('Navigating to: /profile/profile.html');
+        window.location.href = '/profile/profile.html';
+      });
+    }
+    
+    if (friendsBtn) {
+      friendsBtn.addEventListener('click', function() {
+        console.log('Friends button clicked (fallback listener)');
+        window.location.href = '/friends/friends.html';
+      });
+    }
+  });
+  </script>
+
+  <!-- TypeScript module import -->
+  <script type="module" src="../src/home/home.ts"></script>
+  <!-- Inline script for debugging and logout functionality -->
+  <script>
+  // Wait for DOM to be fully loaded
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('Home page HTML loaded');
+    
+    // Get logout button
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (logoutBtn) {
+      // console.log('Found logout button:', logoutBtn);
+      // Remove any existing listeners and add a single one
+      logoutBtn.addEventListener('click', function() {
+        console.log('Logout button clicked!');
+        
+        // Show loading state
+        this.textContent = 'Logging out...';
+        this.disabled = true;
+        
+        // Make request to correct API endpoint matching your backend route
+        fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(response => {
+          console.log('Logout response status:', response.status);
+          
+          // Always redirect to login page regardless of response
+          // This ensures user is logged out even if API request fails
+          window.location.href = '/auth/login.html';
+        })
+        .catch(error => {
+          console.error('Logout error:', error);
+          // Still redirect to login page
+          window.location.href = '/auth/login.html';
+        });
+      });
+    } else {
+      console.error('Could not find logout button!');
+    }
+  });
+  </script>
+
+  <!-- Initialize Translation System -->
+  <script type="module">
+    import i18n from '../src/services/i18nService.js';
+    import { LanguageSwitcher } from '../src/components/LanguageSwitcher.js';
+    
+    console.log('🌍 Initializing translation system...');
+    
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            // Initialize translation system
+            await i18n.init();
+            console.log('✅ Translation system initialized');
+            
+            // Initialize language switcher
+            const languageSwitcherContainer = document.getElementById('languageSwitcher');
+            if (languageSwitcherContainer) {
+                new LanguageSwitcher(languageSwitcherContainer);
+                console.log('✅ Language switcher initialized');
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize translation system:', error);
+        }
+    });
+  </script>
+
+  <!-- Add authentication check script BEFORE your existing scripts -->
+  <script type="module">
+    import { verifyAuthentication } from '../src/router/authRouter.ts';
+    
+    console.log('🏠 Home page loading...');
+    
+    document.addEventListener('DOMContentLoaded', async () => {
+        const loader = document.getElementById('authLoader');
+        
+        try {
+            console.log('🔐 Starting authentication check...');
+            console.log('🍪 Current cookies:', {
+                token: document.cookie.includes('token='),
+                refresh: document.cookie.includes('refresh_token=')
+            });
+            
+            const isAuthenticated = await verifyAuthentication();
+            console.log('🔐 Authentication result:', isAuthenticated);
+            
+            if (isAuthenticated) {
+                console.log('✅ User authenticated - showing home page');
+                if (loader) {
+                    loader.style.display = 'none';
+                }
+            } else {
+                console.log('❌ User not authenticated - redirecting to login');
+                throw new Error('Not authenticated');
+            }
+        } catch (error) {
+            console.error('🚨 Authentication error:', error);
+            // Add delay before redirect to see the logs
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            window.location.replace('/auth/login.html');
+        }
+    });
+  </script>
+</body>
+</html>

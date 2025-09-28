@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rock Paper Scissors - ft_transcendence</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✂️</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module" src="../src/extraGame/rps_new.ts"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(135deg, #1a0033, #2d0066, #1a0033);
+      color: #e6ccff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .game-container {
+      background-color: #0d001a;
+      border: 3px solid #cc66ff;
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 0 30px rgba(204, 102, 255, 0.4);
+      backdrop-filter: blur(15px);
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .game-btn {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%);
+      border: 2px solid #cc66ff;
+      border-radius: 12px;
+      padding: 1rem 2rem;
+      color: #e6ccff;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+
+    .game-btn:hover {
+      transform: translateY(-4px) scale(1.05);
+      border-color: #ff66cc;
+      color: #ff66cc;
+      box-shadow: 0 15px 30px rgba(204, 102, 255, 0.3);
+    }
+
+    .game-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .move-btn {
+      font-size: 1.2rem;
+      min-width: 120px;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .player-area {
+      background: linear-gradient(135deg, rgba(13, 0, 26, 0.8) 0%, rgba(30, 41, 59, 0.8) 100%);
+      border: 2px solid #cc66ff;
+      border-radius: 15px;
+      padding: 2rem;
+      text-align: center;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px rgba(204, 102, 255, 0.2);
+    }
+
+    .score-display {
+      background: linear-gradient(135deg, rgba(13, 0, 26, 0.8) 0%, rgba(30, 41, 59, 0.8) 100%);
+      border: 2px solid #cc66ff;
+      border-radius: 15px;
+      padding: 1.5rem;
+      text-align: center;
+      color: #ff66cc;
+      font-weight: bold;
+      box-shadow: 0 0 20px rgba(204, 102, 255, 0.3);
+    }
+
+    .hero-title {
+      color: #cc66ff;
+      text-shadow: 0 0 30px rgba(204, 102, 255, 0.6);
+      font-size: 2.5rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 2rem;
+    }
+
+    .result-text {
+      font-size: 1.5rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #ff66cc;
+      text-shadow: 0 0 20px rgba(255, 102, 204, 0.6);
+    }
+
+    .back-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+    }
+
+    .back-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- Background Image -->
+  <div class="absolute inset-0 bg-cover bg-center bg-no-repeat" 
+       style="background-image: url('../assets/homepage-bc.jpg');"></div>
+  
+  <!-- Background effects -->
+  <div class="absolute inset-0 overflow-hidden">
+    <div class="absolute w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -top-48 -left-48 animate-pulse"></div>
+    <div class="absolute w-96 h-96 bg-pink-500/10 rounded-full blur-3xl -bottom-48 -right-48 animate-pulse" style="animation-delay: 2s;"></div>
+  </div>
+
+  <!-- Navigation -->
+  <button onclick="window.location.href='/home/home.html'" class="back-btn">
+    ← Back to Home
+  </button>
+
+  <!-- Main Game Container -->
+  <div class="game-container">
+    
+    <!-- Title -->
+    <h1 class="hero-title text-center">
+      ROCK PAPER SCISSORS
+    </h1>
+
+    <!-- Player Setup -->
+    <div class="text-center mb-6">
+      <div class="text-xl font-bold" style="color: #cc66ff;">
+        Player 1: <span id="user-name" style="color: #ff66cc;">Loading...</span>
+      </div>
+      <div class="mt-4">
+        <input 
+          type="text" 
+          id="player2-name" 
+          placeholder="Enter Player 2 name..." 
+          class="px-4 py-2 rounded-lg bg-gray-800 border-2 border-purple-500 text-white text-center"
+          maxlength="20"
+        />
+        <button id="start-game" class="game-btn ml-4">🎮 Start Game</button>
+      </div>
+    </div>
+
+    <!-- Stats Display -->
+    <div id="stats-display" class="score-display mb-6">
+      <div class="text-sm" style="color: #b399d9;">Loading your stats...</div>
+    </div>
+
+    <!-- Game Area -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <!-- Player 1 -->
+      <div class="player-area">
+        <div class="text-lg font-bold mb-2" style="color: #cc66ff;">
+          Player 1: <span id="p1-name">-</span>
+        </div>
+        <div id="p1-move" class="text-6xl mb-2">—</div>
+        <div class="text-xs" style="color: #b399d9;">
+          W = Paper | A = Rock | S = Scissors
+        </div>
+      </div>
+      
+      <!-- Player 2 -->
+      <div class="player-area">
+        <div class="text-lg font-bold mb-2" style="color: #cc66ff;">
+          Player 2: <span id="p2-name">-</span>
+        </div>
+        <div id="p2-move" class="text-6xl mb-2">—</div>
+        <div class="text-xs" style="color: #b399d9;">
+          ↑ = Paper | ← = Rock | ↓ = Scissors
+        </div>
+      </div>
+    </div>
+
+    <!-- Score Display -->
+    <div class="score-display mb-6">
+      <div class="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <div class="text-2xl font-bold" style="color: #ff66cc;" id="score-p1">0</div>
+          <div class="text-sm" style="color: #cc66ff;">Player 1</div>
+        </div>
+        <div>
+          <div class="text-lg" style="color: #b399d9;">Round</div>
+          <div class="text-2xl font-bold" style="color: #cc66ff;" id="round-number">0</div>
+        </div>
+        <div>
+          <div class="text-2xl font-bold" style="color: #ff66cc;" id="score-p2">0</div>
+          <div class="text-sm" style="color: #cc66ff;">Player 2</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Countdown Display -->
+    <div id="countdown" class="result-text text-center mb-6" style="font-size: 3rem;">
+      Enter Player 2 name to start!
+    </div>
+
+    <!-- Result Display -->
+    <div id="result" class="result-text text-center mb-6">
+      
+    </div>
+
+    <!-- Game Controls -->
+    <div class="flex justify-center gap-4">
+      <button id="btn-new-game" class="game-btn" style="background: #16a34a; border-color: #16a34a;">🎮 New Game</button>
+      <button id="btn-reset-stats" class="game-btn" style="background: #dc2626; border-color: #dc2626;">🔄 Reset Stats</button>
+    </div>
+
+  </div>
+
+</body>
+</html>

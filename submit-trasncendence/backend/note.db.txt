@@ -1,0 +1,53 @@
+Why these tables are the best choice?
+1. Users Table
+Field	Reason/Explanation
+id	Unique identifier (UUID or int) for each user. Essential for referencing users in other tables without ambiguity.
+username	Needed for login or identification. It must be unique to avoid conflicts.
+email	Unique and used for communication, password reset, and login. Keeping it unique prevents duplicate accounts.
+password	Stored as a hashed value for security, never plain text. Allows secure authentication.
+display_name	This is what users see in tournaments or on the frontend. It can be different from username/email for privacy or customization. Must be unique in this context to avoid confusion in games.
+avatar_url	URL or path to user avatar image; allows personalization. Default image provided if empty.
+created_at & updated_at	Timestamp fields for audit and data integrity (track when user was created or last updated).
+
+Why it’s good:
+
+This table keeps all the core user info in one place.
+
+Separates login identity (username, email) from display identity (display_name), improving UX.
+
+Designed to scale well, easy to index by unique fields (username, email, display_name).
+
+Secure by design (password hashing).
+
+2. Friends Table
+Field	Reason/Explanation
+id	Unique key for each friend relationship record.
+user_id	The user who added the friend; helps to query friends of a user.
+friend_id	The user who is added as a friend.
+status	Tracks relationship status (e.g., "pending", "accepted", "blocked"). Needed for friend requests workflow.
+
+Why it’s good:
+
+Stores directed relationships (who added whom).
+
+Allows flexible friend statuses, enabling friend requests, pending approvals, or blocks.
+
+Makes querying friends simple, e.g., "friends of user X where status='accepted'".
+
+3. Match History Table
+Field	Reason/Explanation
+id	Unique key for each match record.
+player1_id	References the first player in the match.
+player2_id	References the second player.
+winner_id	Stores who won; simplifies stats computation.
+score_p1	Score of player 1 (to show match detail).
+score_p2	Score of player 2.
+played_at	Timestamp when the match occurred.
+
+Why it’s good:
+
+Tracks detailed history of games between users.
+
+Supports querying stats (wins, losses) by filtering matches where user is player1 or player2.
+
+Can easily extend for more game stats or multiplayer matches later.

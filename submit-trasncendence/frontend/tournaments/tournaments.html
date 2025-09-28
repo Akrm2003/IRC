@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tournaments - Ping Pong Arena</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../src/styles/i18n.css">
+  <style>
+    .tournament-card {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.95) 100%);
+      border: 2px solid transparent;
+      border-radius: 16px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(15px);
+      box-shadow: 
+        0 10px 25px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+    
+    .tournament-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transition: left 0.6s;
+    }
+    
+    .tournament-card:hover::before {
+      left: 100%;
+    }
+    
+    .tournament-card:hover {
+      transform: translateY(-8px) scale(1.02);
+      border-color: rgba(204, 102, 255, 0.6);
+      box-shadow: 
+        0 20px 40px rgba(204, 102, 255, 0.2),
+        0 0 0 1px rgba(204, 102, 255, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .gradient-text {
+      background: linear-gradient(135deg, #cc66ff 0%, #ff66cc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .nav-link {
+      position: relative;
+      padding-bottom: 0.5rem;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #cc66ff, #ff66cc);
+      transition: width 0.3s ease;
+    }
+    
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    
+    .nav-link.active {
+      color: #cc66ff;
+    }
+    
+    .nav-link.active::after {
+      width: 100%;
+    }
+
+    .bracket-match {
+      background: linear-gradient(135deg, rgba(13, 0, 26, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
+      border: 2px solid rgba(204, 102, 255, 0.3);
+      border-radius: 16px;
+      backdrop-filter: blur(15px);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      min-width: 320px;
+      min-height: 200px;
+      margin: 1rem 0;
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(204, 102, 255, 0.1);
+    }
+
+    .bracket-match::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(204, 102, 255, 0.1), transparent);
+      transition: left 0.6s;
+    }
+
+    .bracket-match:hover::before {
+      left: 100%;
+    }
+
+    .bracket-match:hover {
+      border-color: rgba(204, 102, 255, 0.8);
+      transform: scale(1.05);
+      box-shadow: 
+        0 12px 40px rgba(204, 102, 255, 0.3),
+        0 0 0 1px rgba(204, 102, 255, 0.4),
+        inset 0 1px 0 rgba(204, 102, 255, 0.2);
+    }
+
+    .bracket-line {
+      stroke: rgba(204, 102, 255, 0.6);
+      stroke-width: 3;
+      fill: none;
+      filter: drop-shadow(0 0 4px rgba(204, 102, 255, 0.3));
+    }
+
+    .winner-glow {
+      background: linear-gradient(135deg, rgba(204, 102, 255, 0.2) 0%, rgba(255, 102, 204, 0.2) 100%);
+      border-color: rgba(204, 102, 255, 0.9) !important;
+      box-shadow: 
+        0 0 30px rgba(204, 102, 255, 0.6),
+        0 8px 32px rgba(204, 102, 255, 0.3),
+        inset 0 1px 0 rgba(204, 102, 255, 0.3);
+    }
+
+    .bracket-container {
+      background: radial-gradient(ellipse at center, rgba(204, 102, 255, 0.05) 0%, transparent 70%);
+      border-radius: 24px;
+      padding: 3rem 2rem;
+      position: relative;
+      min-height: 600px;
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+
+    .bracket-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        linear-gradient(45deg, transparent 49%, rgba(204, 102, 255, 0.1) 50%, transparent 51%),
+        linear-gradient(-45deg, transparent 49%, rgba(204, 102, 255, 0.1) 50%, transparent 51%);
+      background-size: 20px 20px;
+      opacity: 0.1;
+      border-radius: 24px;
+      pointer-events: none;
+    }
+
+    .round-header {
+      background: linear-gradient(135deg, rgba(204, 102, 255, 0.2) 0%, rgba(255, 102, 204, 0.2) 100%);
+      border: 2px solid rgba(204, 102, 255, 0.4);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 
+        0 4px 20px rgba(204, 102, 255, 0.2),
+        inset 0 1px 0 rgba(204, 102, 255, 0.3);
+    }
+
+    .champion-crown {
+      background: linear-gradient(135deg, rgba(204, 102, 255, 0.3) 0%, rgba(255, 102, 204, 0.3) 100%);
+      border: 3px solid rgba(204, 102, 255, 0.8);
+      border-radius: 20px;
+      box-shadow: 
+        0 0 40px rgba(204, 102, 255, 0.6),
+        0 8px 32px rgba(204, 102, 255, 0.3),
+        inset 0 2px 0 rgba(204, 102, 255, 0.4);
+      animation: championGlow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes championGlow {
+      0% { 
+        box-shadow: 
+          0 0 40px rgba(204, 102, 255, 0.6),
+          0 8px 32px rgba(204, 102, 255, 0.3),
+          inset 0 2px 0 rgba(204, 102, 255, 0.4);
+      }
+      100% { 
+        box-shadow: 
+          0 0 60px rgba(204, 102, 255, 0.8),
+          0 12px 48px rgba(204, 102, 255, 0.4),
+          inset 0 2px 0 rgba(204, 102, 255, 0.6);
+      }
+    }
+
+    .player-slot {
+      background: linear-gradient(135deg, rgba(13, 0, 26, 0.8) 0%, rgba(30, 30, 30, 0.8) 100%);
+      border: 1px solid rgba(204, 102, 255, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .player-slot.winner {
+      background: linear-gradient(135deg, rgba(204, 102, 255, 0.15) 0%, rgba(255, 102, 204, 0.15) 100%);
+      border-color: rgba(204, 102, 255, 0.6);
+      color: #cc66ff;
+    }
+
+    .delete-btn {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      transition: all 0.3s ease;
+    }
+
+    .delete-btn:hover {
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+      transform: scale(1.05);
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+    }
+
+    .floating-animation {
+      animation: float 6s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .status-badge {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-badge::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .status-badge:hover::before {
+      left: 100%;
+    }
+
+    /* Fix responsiveness issues at specific breakpoints */
+    @media (max-width: 1100px) and (min-width: 1050px) {
+      .tournament-card {
+        padding: 1.25rem !important;
+      }
+      
+      nav .hidden.md\\:flex {
+        gap: 1rem !important;
+      }
+      
+      nav .hidden.md\\:flex a {
+        font-size: 0.875rem !important;
+        padding: 0.5rem 0.75rem !important;
+      }
+      
+      #logoutBtn {
+        padding: 0.5rem 1rem !important;
+        font-size: 0.875rem !important;
+      }
+    }
+
+    @media (max-width: 880px) and (min-width: 820px) {
+      .tournament-card {
+        padding: 1rem !important;
+      }
+      
+      .gradient-text {
+        font-size: 1.25rem !important;
+      }
+      
+      nav {
+        padding: 0.75rem 1rem !important;
+      }
+      
+      main {
+        padding: 1.5rem 1rem !important;
+      }
+      
+      .flex.flex-col.lg\\:flex-row {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 1rem !important;
+      }
+      
+      .w-full.sm\\:w-auto {
+        width: 100% !important;
+      }
+    }
+
+    /* Additional fixes for tournament management bar */
+    @media (max-width: 1076px) and (min-width: 1024px) {
+      .tournament-card .flex.flex-col.lg\\:flex-row {
+        flex-direction: column !important;
+        text-align: center !important;
+      }
+      
+      .tournament-card .hidden.lg\\:flex {
+        display: none !important;
+      }
+    }
+
+    @media (max-width: 850px) and (min-width: 768px) {
+      nav .max-w-7xl {
+        padding: 0 1rem !important;
+      }
+      
+      .tournament-card {
+        margin: 0 1rem !important;
+      }
+      
+      h1.gradient-text {
+        font-size: 2.5rem !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-white relative overflow-x-hidden" style="background: linear-gradient(135deg, #1a0033, #2d0066, #1a0033);">
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+      <p class="text-white">Loading tournaments...</p>
+    </div>
+  </div>
+
+  <!-- Background Image -->
+  <div class="absolute inset-0 bg-cover bg-center bg-no-repeat" 
+       style="background-image: url('../assets/homepage-bc.jpg');"></div>
+  
+  <!-- Background effects matching RPS -->
+  <div class="absolute inset-0 overflow-hidden">
+    <div class="absolute w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -top-48 -left-48 animate-pulse"></div>
+    <div class="absolute w-96 h-96 bg-pink-500/10 rounded-full blur-3xl -bottom-48 -right-48 animate-pulse" style="animation-delay: 2s;"></div>
+  </div>
+  
+  <!-- Content overlay -->
+  <div class="relative z-10 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-slate-800/70 backdrop-blur-md px-4 sm:px-8 py-4 border-b border-slate-700/50 shadow-xl">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex justify-between items-center">
+          <!-- Logo/Brand -->
+          <div class="flex items-center">
+            <a href="/home/home.html" class="text-xl sm:text-2xl font-bold text-white flex items-center group transition-all duration-300">
+              <span class="gradient-text brand-name">Ping Pong Arena</span>
+            </a>
+          </div>
+          
+          <!-- Desktop Navigation -->
+          <div class="hidden md:flex items-center gap-6">
+            <a href="/home/home.html" class="nav-link text-slate-300 hover:text-white transition-colors" data-i18n="common.home">Home</a>
+            <a href="/friends/friends.html" class="nav-link text-slate-300 hover:text-white transition-colors" data-i18n="common.friends">Friends</a>
+            <a href="/profile/profile.html" class="nav-link text-slate-300 hover:text-white transition-colors" data-i18n="common.profile">Profile</a>
+            <a href="/tournaments/tournaments.html" class="nav-link active text-purple-400 font-medium" data-i18n="common.tournaments">Tournaments</a>
+            
+            <!-- Language Switcher -->
+            <div id="languageSwitcher"></div>
+            
+            <button id="logoutBtn" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-4 py-2 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105" data-i18n="common.logout">
+              Logout
+            </button>
+          </div>
+          
+          <!-- Mobile menu button -->
+          <button id="mobileMenuBtn" class="md:hidden text-white p-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Mobile Navigation -->
+        <div id="mobileMenu" class="hidden md:hidden mt-4 pb-4 border-t border-slate-700/50">
+          <div class="flex flex-col space-y-3 pt-4">
+            <a href="/home/home.html" class="nav-link text-slate-300 hover:text-white transition-colors text-center py-2">Home</a>
+            <a href="/friends/friends.html" class="nav-link text-slate-300 hover:text-white transition-colors text-center py-2">Friends</a>
+            <a href="/profile/profile.html" class="nav-link text-slate-300 hover:text-white transition-colors text-center py-2">Profile</a>
+            <a href="/tournaments/tournaments.html" class="nav-link active text-purple-400 font-medium text-center py-2">Tournaments</a>
+            <button id="logoutBtnMobile" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-4 py-2 rounded-lg transition-all duration-300 mx-4 mt-2">
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <!-- Hero Section -->
+      <div class="text-center mb-12 floating-animation">
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black mb-4 gradient-text tracking-tight">
+          TOURNAMENTS
+        </h1>
+        <p class="text-lg sm:text-xl text-slate-300 font-light max-w-2xl mx-auto leading-relaxed">
+          Create and compete in epic ping pong championships
+        </p>
+      </div>
+
+      <!-- Tournament Actions Bar -->
+      <div class="mb-6 sm:mb-8">
+        <div class="tournament-card p-4 sm:p-6">
+          <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
+            <div class="flex flex-col sm:flex-row items-center gap-4 lg:gap-6 text-center sm:text-left">
+              <h2 class="text-lg sm:text-xl font-bold text-white">
+                Tournament Management
+              </h2>
+              <div class="hidden lg:flex items-center gap-4 text-sm text-slate-400">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 bg-purple-400 rounded-full"></span>
+                  <span>Local Multiplayer</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 bg-purple-400 rounded-full"></span>
+                  <span>Same Keyboard</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 bg-purple-400 rounded-full"></span>
+                  <span>Real-time Brackets</span>
+                </div>
+              </div>
+            </div>
+            
+            <button id="createTournamentBtn" class="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+              </svg>
+              <span class="text-sm sm:text-base">Create Tournament</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="space-y-8">
+        <!-- Tournaments List -->
+        <div id="tournamentsList">
+          <!-- Tournaments will be loaded here by JavaScript -->
+        </div>
+        
+        <!-- Tournament Detail View (Hidden by default) -->
+        <div id="tournamentDetail" class="hidden">
+          <!-- Will be populated by JavaScript -->
+        </div>
+        
+        <!-- Create Tournament Form (Hidden by default) -->
+        <div id="createTournamentForm" class="hidden">
+          <!-- The detailed form will be rendered here by JavaScript -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile menu toggle functionality -->
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    
+    if (mobileMenuBtn && mobileMenu) {
+      mobileMenuBtn.addEventListener('click', () => {
+        mobileMenu.classList.toggle('hidden');
+        
+        // Update hamburger icon
+        const svg = mobileMenuBtn.querySelector('svg path');
+        if (mobileMenu.classList.contains('hidden')) {
+          svg.setAttribute('d', 'M4 6h16M4 12h16M4 18h16'); // Hamburger
+        } else {
+          svg.setAttribute('d', 'M6 18L18 6M6 6l12 12'); // X
+        }
+      });
+    }
+    
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (mobileMenu && !mobileMenu.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+        mobileMenu.classList.add('hidden');
+        const svg = mobileMenuBtn.querySelector('svg path');
+        svg.setAttribute('d', 'M4 6h16M4 12h16M4 18h16'); // Reset to hamburger
+      }
+    });
+  });
+  </script>
+
+  <!-- Initialize Translation System -->
+  <script type="module">
+    import i18n from '../src/services/i18nService.js';
+    import { LanguageSwitcher } from '../src/components/LanguageSwitcher.js';
+    
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            await i18n.init();
+            const languageSwitcherContainer = document.getElementById('languageSwitcher');
+            if (languageSwitcherContainer) {
+                new LanguageSwitcher(languageSwitcherContainer);
+            }
+        } catch (error) {
+            console.error('Failed to initialize translation system:', error);
+        }
+    });
+  </script>
+
+  <!-- JavaScript -->
+  <script type="module" src="/src/tournament/tournaments.ts"></script>
+</body>
+</html>

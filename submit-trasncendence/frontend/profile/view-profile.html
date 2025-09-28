@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Profile | Ping Pong Arena</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Base styles */
+    body {
+        color: white;
+        min-height: 100vh;
+        position: relative;
+    }
+    
+    /* Background image */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('../assets/homepage-bc.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        z-index: -1;
+    }
+    
+    /* Profile card styles */
+    .profile-card {
+        background: rgba(30, 41, 59, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(71, 85, 105, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .profile-card:hover {
+        border-color: rgba(59, 130, 246, 0.5);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Stats card animations */
+    .stat-card {
+        background: rgba(51, 65, 85, 0.8);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(71, 85, 105, 0.3);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        transition: left 0.5s ease;
+    }
+    
+    .stat-card:hover::before {
+        left: 100%;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(59, 130, 246, 0.4);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* Button enhancements */
+    .btn-secondary {
+        background: linear-gradient(135deg, #6b7280, #4b5563);
+        border: 1px solid rgba(107, 114, 128, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .btn-secondary:hover {
+        background: linear-gradient(135deg, #4b5563, #374151);
+        border-color: rgba(107, 114, 128, 0.5);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* Match history styles */
+    .match-card {
+        background: rgba(51, 65, 85, 0.6);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(71, 85, 105, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .match-card:hover {
+        background: rgba(51, 65, 85, 0.8);
+        border-color: rgba(71, 85, 105, 0.4);
+        transform: translateX(4px);
+    }
+    
+    .win { border-left: 4px solid #10b981; }
+    .loss { border-left: 4px solid #ef4444; }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .profile-card {
+            margin: 1rem;
+        }
+        
+        .stat-card {
+            margin-bottom: 1rem;
+        }
+    }
+  </style>
+</head>
+<body class="bg-slate-900">
+  <div class="min-h-screen py-4 sm:py-8">
+    <div class="container mx-auto px-4 sm:px-6 max-w-4xl">
+      
+      <!-- Back Button -->
+      <div class="mb-4 sm:mb-6">
+        <button onclick="history.back()" class="btn-secondary px-3 sm:px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:scale-105 transition-transform text-sm sm:text-base">
+          <span>←</span> Back
+        </button>
+      </div>
+
+      <!-- Viewing Other User Indicator -->
+      <div class="bg-blue-500/20 border border-blue-500 text-blue-100 px-3 sm:px-4 py-3 rounded-lg mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+        <span class="text-sm sm:text-base">👤 Viewing user profile</span>
+        <button onclick="history.back()" class="text-blue-300 hover:text-blue-100 underline text-sm">
+          Go Back
+        </button>
+      </div>
+
+      <!-- Profile Container -->
+      <div class="profile-container">
+        <!-- Profile Header -->
+        <div class="profile-card rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8 text-center">
+          <div class="relative inline-block mb-4 sm:mb-6">
+            <img 
+              id="profileAvatar" 
+              src="" 
+              alt="Profile Avatar" 
+              class="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full object-cover border-4 border-slate-600 mx-auto shadow-xl"
+            >
+          </div>
+          
+          <div class="space-y-2">
+            <h1 id="username" class="text-2xl sm:text-3xl font-bold text-white">Loading...</h1>
+            <p id="displayName" class="text-lg sm:text-xl text-slate-300"></p>
+            <p id="email" class="text-sm sm:text-base text-slate-400"></p>
+            <p id="joinDate" class="text-xs sm:text-sm text-slate-500"></p>
+          </div>
+        </div>
+
+        <!-- Stats Grid - Responsive -->
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+          <div class="stat-card rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 text-center">
+            <div class="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-400" id="totalMatches">0</div>
+            <div class="text-slate-300 mt-1 sm:mt-2 text-xs sm:text-sm">Total Matches</div>
+          </div>
+          
+          <div class="stat-card rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 text-center">
+            <div class="text-xl sm:text-2xl lg:text-3xl font-bold text-green-400" id="wins">0</div>
+            <div class="text-slate-300 mt-1 sm:mt-2 text-xs sm:text-sm">Wins</div>
+          </div>
+          
+          <div class="stat-card rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 text-center">
+            <div class="text-xl sm:text-2xl lg:text-3xl font-bold text-red-400" id="losses">0</div>
+            <div class="text-slate-300 mt-1 sm:mt-2 text-xs sm:text-sm">Losses</div>
+          </div>
+          
+          <div class="stat-card rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 text-center">
+            <div class="text-xl sm:text-2xl lg:text-3xl font-bold text-yellow-400" id="winRate">0%</div>
+            <div class="text-slate-300 mt-1 sm:mt-2 text-xs sm:text-sm">Win Rate</div>
+          </div>
+        </div>
+
+        <!-- Match History - Responsive -->
+        <div class="profile-card rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8">
+          <h2 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center">Recent Matches</h2>
+          <div id="matchHistory" class="space-y-3 sm:space-y-4">
+            <div class="text-center text-slate-400 py-6 sm:py-8">
+              Loading match history...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error/Success Messages Container -->
+  <div id="messages" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+  <script type="module" src="../src/profile/view-profile.ts"></script>
+</body>
+</html>

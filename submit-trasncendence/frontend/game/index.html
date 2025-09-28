@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong Games - ft_transcendence</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏓</text></svg>">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: white;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .game-menu {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ffd700;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+        }
+        
+        .title {
+            font-size: 48px;
+            color: #ffd700;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: #ccc;
+            margin-bottom: 40px;
+        }
+        
+        .game-option {
+            display: block;
+            width: 300px;
+            margin: 20px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #333, #555);
+            border: 2px solid #666;
+            border-radius: 15px;
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .game-option:hover {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: black;
+            border-color: #ffd700;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+        }
+        
+        .game-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        
+        .back-btn {
+            margin-top: 30px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #666, #888);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .back-btn:hover {
+            background: linear-gradient(135deg, #888, #aaa);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-menu">
+        <div class="title">PONG</div>
+        <div class="subtitle">Choose Your Game Mode</div>
+        
+        <a href="game_pvp/index.html" class="game-option">
+            <span class="game-icon">👥</span>
+            Player vs Player
+            <div style="font-size: 14px; margin-top: 5px; opacity: 0.8;">
+                Local multiplayer on same keyboard
+            </div>
+        </a>
+        
+        <a href="game_ai/index.html" class="game-option">
+            <span class="game-icon">🤖</span>
+            Player vs AI
+            <div style="font-size: 14px; margin-top: 5px; opacity: 0.8;">
+                Challenge the computer opponent
+            </div>
+        </a>
+        
+        <div class="game-option" style="background: linear-gradient(135deg, #444, #666); cursor: not-allowed; opacity: 0.7;">
+            <span class="game-icon">🏆</span>
+            Tournament Mode
+            <div style="font-size: 14px; margin-top: 5px; opacity: 0.8;">
+                Available through Tournament System
+            </div>
+        </div>
+        
+        <button class="back-btn" onclick="window.location.href='/'">
+            ← Back to Home
+        </button>
+    </div>
+</body>
+</html>

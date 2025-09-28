@@ -1,0 +1,172 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  output          = "../generated/prisma"
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+//tables
+
+model User {
+  id           Int      @id @default(autoincrement())
+  google_id    String?  @unique
+  username     String   @unique
+  email        String   @unique
+  password     String?
+  avatar_url   String? // optional
+  display_name String? // optional
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  totp_secret  String?  @unique
+
+  // Friend relations
+  friendsSent     Friend[] @relation("SentFriendRequests") // this user sent requests
+  friendsReceived Friend[] @relation("ReceivedFriendRequests") // this user received requests
+
+  // Match relations
+  matchesAsPlayer1 Match[] @relation("Player1")
+  matchesWon       Match[] @relation("Winner")
+
+  // Message relations
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+
+  // Tournament relations
+  createdTournaments Tournament[]
+}
+
+model Friend {
+  id Int @id @default(autoincrement())
+
+  sender   User @relation("SentFriendRequests", fields: [senderId], references: [id])
+  senderId Int
+
+  receiver   User @relation("ReceivedFriendRequests", fields: [receiverId], references: [id])
+  receiverId Int
+
+  status       FriendStatus @default(NOTHING)
+  onlineStatus OnlineStatus @default(OFFLINE)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([senderId, receiverId])
+}
+
+enum OnlineStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum FriendStatus {
+  NOTHING
+  PENDING
+  DECLINED
+  ACCEPTED
+  BLOCKED
+}
+
+model Match {
+  id Int @id @default(autoincrement())
+
+  player1   User @relation("Player1", fields: [player1Id], references: [id])
+  player1Id Int
+
+  player2Name String // Guest player name instead of user ID
+
+  winner   User? @relation("Winner", fields: [winnerId], references: [id])
+  winnerId Int? // Optional - null if guest player wins
+
+  winnerName String // Name of the winner (either user's username or guest name)
+
+  score_p1 Int
+  score_p2 Int
+
+  gameType String @default("pong") // Game type: "pong", "rock_paper_scissors", etc.
+
+  played_at DateTime @default(now())
+
+  // Tournament relation
+  tournamentMatch TournamentMatch?
+}
+
+model Message {
+  id Int @id @default(autoincrement())
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id])
+  senderId Int
+
+  receiver   User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiverId Int
+
+  content String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  status MessageStatus @default(PENDING) //  status tracking
+
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+}
+
+model Tournament {
+  id          Int                @id @default(autoincrement())
+  name        String
+  status      TournamentStatus   @default(UPCOMING)
+  createdBy   User               @relation(fields: [createdById], references: [id])
+  createdById Int
+  winnerName  String? // Name of the tournament winner
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  players     TournamentPlayer[]
+  matches     TournamentMatch[]
+}
+
+model TournamentMatch {
+  id           Int        @id @default(autoincrement())
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  tournamentId Int
+  match        Match      @relation(fields: [matchId], references: [id])
+  matchId      Int        @unique
+  roundNumber  Int // 1 for finals, 2 for semis, etc.
+  matchNumber  Int // Position in the bracket
+  player1Name  String // Either the user's username or "Guest X"
+  player2Name  String // Either the user's username or "Guest X"
+  winnerName   String? // The name of the winner
+  isBye        Boolean    @default(false)
+}
+
+model TournamentPlayer {
+  id           Int        @id @default(autoincrement())
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  tournamentId Int
+  playerName   String // "Guest X" for all players except the user
+  isUser       Boolean    @default(false) // true only for the logged-in user
+  seed         Int? // For bracket positioning
+}
+
+enum TournamentStatus {
+  UPCOMING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}

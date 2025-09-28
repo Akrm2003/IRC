@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2FA Verification | Ping Pong Game</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏓</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      color: white;
+      min-height: 100vh;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+    }
+    
+    /* Background image - fixed to prevent white space on scroll */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('../assets/homepage-bc.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      z-index: -1;
+    }
+    
+    .glass-effect {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .ping-pong-ball {
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      animation: bounce 2s infinite;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+    
+    .code-input {
+      background: rgba(15, 23, 42, 0.8);
+      border: 2px solid rgba(59, 130, 246, 0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .code-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+  <div class="glass-effect rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="flex justify-center items-center mb-4">
+        <span class="text-4xl mr-2">🏓</span>
+        <div class="ping-pong-ball"></div>
+      </div>
+      <h1 class="text-3xl font-bold text-white mb-2">2FA Verification</h1>
+      <p class="text-slate-300">Enter the 6-digit code from your authenticator app</p>
+    </div>
+
+    <!-- 2FA Form -->
+    <form id="twoFAForm" class="space-y-6">
+      <div>
+        <label for="code" class="block text-sm font-medium text-slate-300 mb-2">
+          Verification Code
+        </label>
+        <input 
+          type="text" 
+          id="code" 
+          name="code" 
+          class="code-input w-full px-4 py-3 rounded-xl border-0 text-white text-center text-2xl tracking-widest font-mono"
+          placeholder="000000"
+          maxlength="6"
+          pattern="[0-9]{6}"
+          required
+          autocomplete="off"
+        >
+      </div>
+
+      <button 
+        type="submit" 
+        class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+      >
+        Verify Code
+      </button>
+    </form>
+
+    <!-- Back to Login -->
+    <div class="text-center mt-6">
+      <a href="/auth/login" class="text-blue-400 hover:text-blue-300 text-sm transition-colors">
+        ← Back to Login
+      </a>
+    </div>
+  </div>
+
+  <!-- TypeScript module import -->
+  <script type="module" src="../src/auth/twoFAHandler.ts"></script>
+</body>
+</html>
